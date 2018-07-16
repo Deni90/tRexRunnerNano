@@ -1,0 +1,7 @@
+*.cproject
+*.project
+*.settings
+*Release
+*.o
+*.elf
+*.hex
