@@ -13,4 +13,8 @@
 #define WIDTH                   SSD1306_LCDWIDTH
 #define HEIGHT                  SSD1306_LCDHEIGHT
 
+#define RENDER_PERIOD           1000
+
+void FB_Clear();
+
 #endif /* TREXRUNNER_H_ */
