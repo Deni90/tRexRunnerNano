@@ -7,11 +7,24 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <math.h>
 
 #include "tRexRunner.h"
 
+#define CONCAT(a, b)            a ## b
+#define CONCAT_EXP(a, b)        CONCAT(a, b)
+
+#define BUTTON_OUTPORT          CONCAT_EXP(PORT, BUTTON_IOPORTNAME)
+#define BUTTON_INPORT           CONCAT_EXP(PIN, BUTTON_IOPORTNAME)
+#define BUTTON_DDRPORT          CONCAT_EXP(DDR, BUTTON_IOPORTNAME)
+
+#define left_button()           (!(BUTTON_INPORT & (1 << LEFT_BUTTON_BIT)))
+#define right_button()           (!(BUTTON_INPORT & (1 << RIGHT_BUTTON_BIT)))
+
 static uint8_t frame_buffer[WIDTH * HEIGHT / 8];
 volatile uint16_t global_clock = 0;
+volatile uint8_t lb_debounce_clock = 0;
+volatile uint8_t rb_debounce_clock = 0;
 volatile uint16_t test_clock = 0;
 //128x3
 static const __flash uint8_t horizon_line[] =
@@ -118,6 +131,8 @@ void TIMER_init(void)
 ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
 {
     global_clock++;
+    lb_debounce_clock++;
+    rb_debounce_clock++;
     test_clock++;
 }
 
@@ -151,6 +166,12 @@ void FB_drawImage(int8_t x, int8_t y, const __flash uint8_t* image, uint8_t widt
     }
 }
 
+void FB_drawGameObject(game_object_t game_object)
+{
+    FB_drawImage(game_object.x, game_object.y, game_object.sprite,
+            game_object.width, game_object.height);
+}
+
 int main(void)
 {
     TIMER_init();
@@ -158,69 +179,105 @@ int main(void)
     SSD1306_init();
     SSD1306_clear();
 
-        game_object_t horizon = {
-    WIDTH,
-    HEIGHT - HORIZON_LINE_HEIGHT - 1,
-    HORIZON_LINE_WIDTH,
-    HORIZON_LINE_HEIGHT, horizon_line };
+    // init buttons
+    BUTTON_OUTPORT |= (1 << LEFT_BUTTON_BIT); // pull up LEFT_BUTTON_IO
+    BUTTON_DDRPORT &= ~(1 << LEFT_BUTTON_BIT); // configure LEFT_BUTTON_IO as input
+
+    BUTTON_OUTPORT |= (1 << RIGHT_BUTTON_BIT); // pull up the RIGHT_BUTTON_IO
+    BUTTON_DDRPORT &= ~(1 << RIGHT_BUTTON_BIT); // configure RIGHT_BUTTON_IO as input
+
+    game_object_t horizon = {
+        WIDTH,
+        HEIGHT - HORIZON_LINE_HEIGHT - 1,
+        HORIZON_LINE_WIDTH,
+        HORIZON_LINE_HEIGHT, horizon_line
+    };
     float horizon_delta = 0;
 
     game_object_t trex = {
-            8,
-            HEIGHT - TREX_STANDING_HEIGHT - 1,
-            TREX_DUCKING_WIDTH,
-            TREX_DUCKING_HEIGHT, trex_ducking2
+        8,
+        HEIGHT - TREX_STANDING_HEIGHT - 1,
+        TREX_STANDING_WIDTH,
+        TREX_STANDING_HEIGHT, trex_running1
     };
-    trex_states_t trex_state = DUCKING;
+    trex_states_t trex_state = RUNNING;
     uint8_t trex_running_leg = 0;
     unsigned int running_counter = 0;
     float trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
     uint8_t jump_max_y_reached = 0;
 
     game_object_t pterodactyl = {
-            WIDTH, //TODO change me
-            5,
-            PTERODACTYL_WIDTH,
-            PTERODACTYL_HEIGHT,
-            pterodactyl1
+        WIDTH, //TODO change me
+        5,
+        PTERODACTYL_WIDTH,
+        PTERODACTYL_HEIGHT, pterodactyl1
     };
     uint8_t pterodactyl_wing = 0;
     float pterodactyl_x_delta = WIDTH;
     unsigned int flapping_counter = 0;
 
+    uint8_t button_state = 0x00;
+
     while (1)
     {
-        /* TODO HANDLE BUTTONS */
-        if (test_clock >= 3000)
+        /* HANDLE BUTTONS */
+        cli();
+        if (lb_debounce_clock >= DEBOUNCE_INTERVAL)
         {
-            if (trex_state != JUMPING)
-            {
-                test_clock = 0;
-                jump_max_y_reached = 0;
-                trex_state = JUMPING;
-            }
+            lb_debounce_clock = 0;
+            if (!(PIND & (1 << PD0)))
+                button_state |= (1 << PD0);
+            else
+                button_state &= ~(1 << PD0);
+        } else if ((button_state & (1 << PD0)) == !(PIND & (1 << PD0)))
+        {
+            lb_debounce_clock = 0;
         }
+
+        if (rb_debounce_clock >= DEBOUNCE_INTERVAL)
+        {
+            rb_debounce_clock = 0;
+            if (!(PIND & (1 << PD1)))
+                button_state |= (1 << PD1);
+            else
+                button_state &= ~(1 << PD1);
+        } else if ((button_state & (1 << PD1)) == !(PIND & (1 << PD1)))
+        {
+            rb_debounce_clock = 0;
+        }
+        sei();
 
         /* UPDATE GAME */
         if (global_clock >= RENDER_PERIOD)
         {
             global_clock = 0;
+
+            if (button_state & (1 << PD0))
+            {
+                trex_state = JUMPING;
+            }
+            if ((button_state & (1 << PD1)) && (trex_state != JUMPING))
+            {
+                trex_state = DUCKING;
+            } else if (trex_state != JUMPING)
+            {
+                trex_state = RUNNING;
+            }
+
             FB_Clear();
 
-
             /* HORIZONT LINE BEGIN*/
-            FB_drawImage(horizon.x, horizon.y, horizon.sprite,
-                    horizon.width, horizon.height);
+            FB_drawImage(horizon.x, horizon.y, horizon.sprite, horizon.width,
+                    horizon.height);
             if (horizon_delta < 0)
             {
-                FB_drawImage(WIDTH + horizon.x, horizon.y,
-                        horizon.sprite, horizon.width, horizon.height);
+                FB_drawImage(WIDTH + horizon.x, horizon.y, horizon.sprite,
+                        horizon.width, horizon.height);
             }
             if (horizon_delta + 128 > 0)
             {
                 horizon_delta -= GAME_SPEED;
-            }
-            else
+            } else
             {
                 horizon_delta = 0;
             }
@@ -254,14 +311,11 @@ int main(void)
                     pterodactyl_wing = 1;
                 }
             }
-
-            FB_drawImage(pterodactyl.x, pterodactyl.y, pterodactyl.sprite,
-                        pterodactyl.width, pterodactyl.height);
+            FB_drawGameObject(pterodactyl);
             /* PTERODACTYL END */
 
             if (trex_state == RUNNING)
             {
-                trex.x = 8; //FIXME
                 trex.y = HEIGHT - TREX_STANDING_HEIGHT - 1;
                 trex.width = TREX_STANDING_WIDTH;
                 trex.height = TREX_STANDING_HEIGHT;
@@ -278,11 +332,8 @@ int main(void)
                         trex.sprite = trex_running1;
                     }
                 }
-                FB_drawImage(trex.x, trex.y, trex.sprite, trex.width,
-                        trex.height);
             } else if (trex_state == DUCKING)
             {
-                trex.x = 8; //FIXME
                 trex.y = HEIGHT - TREX_DUCKING_HEIGHT - 1;
                 trex.width = TREX_DUCKING_WIDTH;
                 trex.height = TREX_DUCKING_HEIGHT;
@@ -299,8 +350,6 @@ int main(void)
                         trex.sprite = trex_ducking2;
                     }
                 }
-                FB_drawImage(trex.x, trex.y, trex.sprite, trex.width,
-                        trex.height);
             } else if (trex_state == JUMPING)
             {
                 trex.width = TREX_STANDING_WIDTH;
@@ -327,11 +376,18 @@ int main(void)
                 //next state running
                 if (jump_max_y_reached
                         && trex.y > (HEIGHT - TREX_STANDING_HEIGHT - 2))
-                    trex_state = RUNNING;
-
-                FB_drawImage(trex.x, trex.y, trex.sprite, trex.width,
-                        trex.height);
+                {
+                    if (button_state & (1 << PD1))
+                    {
+                        trex_state = DUCKING;
+                    } else
+                    {
+                        trex_state = RUNNING;
+                    }
+                    jump_max_y_reached = 0;
+                }
             }
+            FB_drawGameObject(trex);
             /* RENDER */
             SSD1306_display(frame_buffer);
         }
