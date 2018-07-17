@@ -190,7 +190,8 @@ int main(void)
         WIDTH,
         HEIGHT - HORIZON_LINE_HEIGHT - 1,
         HORIZON_LINE_WIDTH,
-        HORIZON_LINE_HEIGHT, horizon_line
+        HORIZON_LINE_HEIGHT,
+        horizon_line
     };
     float horizon_delta = 0;
 
@@ -198,7 +199,8 @@ int main(void)
         8,
         HEIGHT - TREX_STANDING_HEIGHT - 1,
         TREX_STANDING_WIDTH,
-        TREX_STANDING_HEIGHT, trex_running1
+        TREX_STANDING_HEIGHT,
+        trex_running1
     };
     trex_states_t trex_state = RUNNING;
     uint8_t trex_running_leg = 0;
@@ -210,7 +212,8 @@ int main(void)
         WIDTH, //TODO change me
         5,
         PTERODACTYL_WIDTH,
-        PTERODACTYL_HEIGHT, pterodactyl1
+        PTERODACTYL_HEIGHT,
+        pterodactyl1
     };
     uint8_t pterodactyl_wing = 0;
     float pterodactyl_x_delta = WIDTH;
