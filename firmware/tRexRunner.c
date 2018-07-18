@@ -172,6 +172,18 @@ void FB_drawGameObject(game_object_t game_object)
             game_object.width, game_object.height);
 }
 
+// TODO turning on
+// TODO battery monitor
+// TODO inactivity monitor
+
+// TODO start game animation
+// TODO score + highscore
+// TODO collision detection
+// TODO game over
+// TODO random cactus and pterodactyl generation
+// TODO fix trex ducking glitch
+// TODO add clearence between trex and horizon
+
 int main(void)
 {
     TIMER_init();
