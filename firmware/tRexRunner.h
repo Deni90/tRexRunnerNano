@@ -24,15 +24,21 @@
 #define TREX_DUCKING_WIDTH      22
 #define TREX_DUCKING_HEIGHT     9
 
-#define PTERODACTYL_WIDTH       11
-#define PTERODACTYL_HEIGHT      10
-#define PTERODACTYL_WING_SWAP   20
+#define PTERODACTYL_WIDTH               11
+#define PTERODACTYL_HEIGHT              10
+#define PTERODACTYL_WING_SWAP           20
+
+#define PTERODACTYL_MIN_FLY_HEIGHT      (HEIGHT - PTERODACTYL_HEIGHT)
+#define PTERODACTYL_MAX_FLY_HEIGHT      (HEIGHT - TREX_STANDING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 
 #define TREX_RUNNING_SPEED      8
 #define TREX_MAX_JUMP_HEIGHT    (HEIGHT - 2)
 
+#define CACTUS_NUMBER_OF_SPECIES        3
+#define CACTUS_PADDING_BOTTOM           2
+
 #define GAME_GRAVITY            1.1f
-#define GAME_INITIAL_SPEED      1.0f
+#define GAME_INITIAL_SPEED      0.5f
 #define JUMPING_SPEED           1.05f
 
 #define DEBOUNCE_INTERVAL       50
@@ -51,6 +57,7 @@ typedef struct game_object_s {
     uint8_t width;
     uint8_t height;
     const uint8_t *sprite;
+    float delta;
 } game_object_t;
 
 void FB_clear();
@@ -58,8 +65,13 @@ void FB_drawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t wi
 void FB_drawGameObject(game_object_t game_object);
 
 void GAME_UpdateHorizon(game_object_t *horizon);
+
+void GAME_CreatePterodactyl(game_object_t *pterodactyl);
 void GAME_UpdatePterodactyl(game_object_t *pterodactyl);
+
+void GAME_CreateCactus(game_object_t *cactus);
 void GAME_UpdateCactus(game_object_t *cactus);
+
 void GAME_UpdateRunningTrex(game_object_t *trex);
 void GAME_UpdateDuckingTrex(game_object_t *trex);
 void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state);

@@ -8,6 +8,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "tRexRunner.h"
 
@@ -27,6 +28,8 @@ volatile uint16_t global_clock = 0;
 volatile uint8_t lb_debounce_clock = 0;
 volatile uint8_t rb_debounce_clock = 0;
 volatile uint16_t test_clock = 0;
+
+volatile uint32_t seed = 0;
 
 uint8_t button_state = 0x00;
 
@@ -179,6 +182,7 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
     lb_debounce_clock++;
     rb_debounce_clock++;
     test_clock++;
+    seed++;
 }
 
 void FB_clear()
@@ -219,35 +223,43 @@ void FB_drawGameObject(game_object_t game_object)
 
 void GAME_UpdateHorizon(game_object_t *horizon)
 {
-    static float horizon_delta = 0;
-
     FB_drawGameObject(*horizon);
-    if (horizon_delta < 0)
+    if (horizon->delta < 0)
     {
         game_object_t new_horizon = *horizon;
         new_horizon.x = WIDTH + horizon->x;
         FB_drawGameObject(new_horizon);
     }
-    if (horizon_delta + 128 > 0)
+    if (horizon->delta + 128 > 0)
     {
-        horizon_delta -= game_speed;
+        horizon->delta -= game_speed;
     } else
     {
-        horizon_delta = 0;
+        horizon->delta = 0;
     }
-    horizon->x = floor(horizon_delta);
+    horizon->x = floor(horizon->delta);
+}
+
+void GAME_CreatePterodactyl(game_object_t *pterodactyl)
+{
+    uint8_t range = PTERODACTYL_MIN_FLY_HEIGHT - PTERODACTYL_MAX_FLY_HEIGHT;
+    pterodactyl->x = WIDTH;
+    pterodactyl->y = PTERODACTYL_MAX_FLY_HEIGHT + (rand() % range);
+    pterodactyl->width = PTERODACTYL_WIDTH;
+    pterodactyl->height = PTERODACTYL_HEIGHT;
+    pterodactyl->sprite = pterodactyl1;
+    pterodactyl->delta = pterodactyl->x;
 }
 
 void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
 {
     static unsigned int flapping_counter = 0;
-    float pterodactyl_delta = pterodactyl->x;
 
     // move to the left in small steps
-    if (pterodactyl_delta + pterodactyl->width > 0)
-        pterodactyl_delta -= game_speed;
+    if (pterodactyl->delta + pterodactyl->width > 0)
+        pterodactyl->delta -= game_speed;
 
-    pterodactyl->x = floor(pterodactyl_delta);
+    pterodactyl->x = floor(pterodactyl->delta);
 
 
     if (++flapping_counter >= PTERODACTYL_WING_SWAP)
@@ -265,14 +277,47 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
     FB_drawGameObject(*pterodactyl);
 }
 
+void GAME_CreateCactus(game_object_t *cactus)
+{
+
+    uint8_t cactus_type = rand() % CACTUS_NUMBER_OF_SPECIES;
+
+    cactus->x = WIDTH;
+    cactus->y = HEIGHT - CACTUS_PADDING_BOTTOM;
+    cactus->delta = WIDTH;
+
+    switch(cactus_type){
+    case 0:
+        cactus->sprite = cactus1;
+        cactus->width = 5;
+        cactus->height = 8;
+        break;
+    case 1:
+        cactus->sprite = cactus2;
+        cactus->width = 5;
+        cactus->height = 8;
+        break;
+    case 2:
+        cactus->sprite = cactus4;
+        cactus->width = 8;
+        cactus->height = 13;
+        break;
+    default:
+        cactus->sprite = cactus4;
+        cactus->width = 6;
+        cactus->height = 9;
+    }
+
+    cactus->y -= cactus->height;
+}
+
 void GAME_UpdateCactus(game_object_t *cactus)
 {
-    float cactus_delta = cactus->x;
         // move to the left in small steps
-    if (cactus_delta + cactus->width > 0)
-        cactus_delta -= game_speed;
+    if (cactus->delta + cactus->width > 0)
+        cactus->delta -= game_speed;
 
-    cactus->x = floor(cactus_delta);
+    cactus->x = floor(cactus->delta);
     FB_drawGameObject(*cactus);
 }
 
@@ -414,7 +459,8 @@ int main(void)
         HEIGHT - HORIZON_LINE_HEIGHT - 1,
         HORIZON_LINE_WIDTH,
         HORIZON_LINE_HEIGHT,
-        horizon_line
+        horizon_line,
+        0
     };
 
     game_object_t trex = {
@@ -422,30 +468,29 @@ int main(void)
         HEIGHT - TREX_STANDING_HEIGHT - 1,
         TREX_STANDING_WIDTH,
         TREX_STANDING_HEIGHT,
-        trex_running1
+        trex_running1,
+        HEIGHT - TREX_STANDING_HEIGHT - 1
     };
 
     trex_states_t trex_state = RUNNING;
 
     //TODO change me
-    game_object_t pterodactyl = {
-        WIDTH,
-        15,
-        PTERODACTYL_WIDTH,
-        PTERODACTYL_HEIGHT,
-        pterodactyl1
-    };
-    game_object_t cactus = {
-        WIDTH+20, //TODO change me
-        21,
-        5,
-        8,
-        cactus1
-    };
+    game_object_t pterodactyl;
+    game_object_t cactus;
+
+    while(!button_state)
+    {
+        BUTTONS_monitorButtons(&button_state);
+    }
+    srand(seed);    // initialize PRNG
+
+    GAME_CreatePterodactyl(&pterodactyl);
+    GAME_CreateCactus(&cactus);
 
     while (1)
     {
         BUTTONS_monitorButtons(&button_state);
+
 
         if (global_clock >= RENDER_PERIOD)
         {
@@ -468,7 +513,7 @@ int main(void)
 
             GAME_UpdateHorizon(&horizon);
 
-            GAME_UpdatePterodactyl(&pterodactyl);
+//            GAME_UpdatePterodactyl(&pterodactyl);
 
             GAME_UpdateCactus(&cactus);
 
