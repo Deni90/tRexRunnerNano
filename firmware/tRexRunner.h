@@ -59,6 +59,7 @@ void FB_drawGameObject(game_object_t game_object);
 
 void GAME_UpdateHorizon(game_object_t *horizon);
 void GAME_UpdatePterodactyl(game_object_t *pterodactyl);
+void GAME_UpdateCactus(game_object_t *cactus);
 void GAME_UpdateRunningTrex(game_object_t *trex);
 void GAME_UpdateDuckingTrex(game_object_t *trex);
 void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state);

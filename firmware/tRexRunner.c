@@ -22,6 +22,7 @@
 #define right_button_state()    (!(BUTTON_INPORT & (1 << RIGHT_BUTTON_BIT)))
 
 static uint8_t frame_buffer[WIDTH * HEIGHT / 8];
+
 volatile uint16_t global_clock = 0;
 volatile uint8_t lb_debounce_clock = 0;
 volatile uint8_t rb_debounce_clock = 0;
@@ -243,7 +244,7 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
     float pterodactyl_delta = pterodactyl->x;
 
     // move to the left in small steps
-    if (pterodactyl_delta + PTERODACTYL_WIDTH > 0)
+    if (pterodactyl_delta + pterodactyl->width > 0)
         pterodactyl_delta -= game_speed;
 
     pterodactyl->x = floor(pterodactyl_delta);
@@ -262,6 +263,17 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
         }
     }
     FB_drawGameObject(*pterodactyl);
+}
+
+void GAME_UpdateCactus(game_object_t *cactus)
+{
+    float cactus_delta = cactus->x;
+        // move to the left in small steps
+    if (cactus_delta + cactus->width > 0)
+        cactus_delta -= game_speed;
+
+    cactus->x = floor(cactus_delta);
+    FB_drawGameObject(*cactus);
 }
 
 void GAME_UpdateRunningTrex(game_object_t *trex)
@@ -417,11 +429,18 @@ int main(void)
 
     //TODO change me
     game_object_t pterodactyl = {
-        WIDTH, //TODO change me
+        WIDTH,
         15,
         PTERODACTYL_WIDTH,
         PTERODACTYL_HEIGHT,
         pterodactyl1
+    };
+    game_object_t cactus = {
+        WIDTH+20, //TODO change me
+        21,
+        5,
+        8,
+        cactus1
     };
 
     while (1)
@@ -451,7 +470,11 @@ int main(void)
 
             GAME_UpdatePterodactyl(&pterodactyl);
 
+            GAME_UpdateCactus(&cactus);
+
             GAME_UpdateTrex(&trex, &trex_state);
+
+
 
             /* RENDER */
             SSD1306_display(frame_buffer);
