@@ -46,15 +46,18 @@ typedef enum trex_states_e {
 } trex_states_t;
 
 typedef struct game_object_s {
-    uint8_t x;
-    uint8_t y;
+    int16_t x;
+    int16_t y;
     uint8_t width;
     uint8_t height;
     const uint8_t *sprite;
 } game_object_t;
 
-void FB_Clear();
-void FB_drawImage(int8_t x, int8_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);
+void FB_clear();
+void FB_drawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);
 void FB_drawGameObject(game_object_t game_object);
+
+void GAME_UpdateHorizon(game_object_t *horizon);
+void GAME_UpdatePterodactyl(game_object_t *pterodactyl);
 
 #endif /* TREXRUNNER_H_ */

@@ -178,12 +178,12 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
     test_clock++;
 }
 
-void FB_Clear()
+void FB_clear()
 {
     memset(frame_buffer, 0, sizeof(uint8_t) * (WIDTH * HEIGHT / 8));
 }
 
-void FB_drawImage(int8_t x, int8_t y, const __flash uint8_t* image, uint8_t width, uint8_t height)
+void FB_drawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height)
 {
     for(int h = y; h < (y + height); h++)
     {
@@ -208,6 +208,12 @@ void FB_drawImage(int8_t x, int8_t y, const __flash uint8_t* image, uint8_t widt
     }
 }
 
+void FB_drawGameObject(game_object_t game_object)
+{
+    FB_drawImage(game_object.x, game_object.y, game_object.sprite,
+            game_object.width, game_object.height);
+}
+
 void GAME_UpdateHorizon(game_object_t *horizon)
 {
     static float horizon_delta = 0;
@@ -229,11 +235,34 @@ void GAME_UpdateHorizon(game_object_t *horizon)
     horizon->x = floor(horizon_delta);
 }
 
-void FB_drawGameObject(game_object_t game_object)
+void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
 {
-    FB_drawImage(game_object.x, game_object.y, game_object.sprite,
-            game_object.width, game_object.height);
+    static unsigned int flapping_counter = 0;
+    float pterodactyl_delta = pterodactyl->x;
+
+    // move to the left in small steps
+    if (pterodactyl_delta + PTERODACTYL_WIDTH > 0)
+        pterodactyl_delta -= game_speed;
+
+    pterodactyl->x = floor(pterodactyl_delta);
+
+
+    if (++flapping_counter >= PTERODACTYL_WING_SWAP)
+    {
+        flapping_counter = 0;
+
+        if (pterodactyl->sprite == pterodactyl1)
+        {
+            pterodactyl->sprite = pterodactyl2;
+        } else
+        {
+            pterodactyl->sprite = pterodactyl1;
+        }
+    }
+    FB_drawGameObject(*pterodactyl);
 }
+
+
 
 // TODO turning on
 // TODO battery monitor
@@ -262,7 +291,6 @@ int main(void)
         HORIZON_LINE_HEIGHT,
         horizon_line
     };
-    float horizon_delta = 0;
 
     game_object_t trex = {
         8,
@@ -279,14 +307,11 @@ int main(void)
 
     game_object_t pterodactyl = {
         WIDTH, //TODO change me
-        5,
+        15,
         PTERODACTYL_WIDTH,
         PTERODACTYL_HEIGHT,
         pterodactyl1
     };
-    uint8_t pterodactyl_wing = 0;
-    float pterodactyl_x_delta = WIDTH;
-    unsigned int flapping_counter = 0;
 
     uint8_t button_state = 0x00;
 
@@ -311,39 +336,11 @@ int main(void)
                 trex_state = RUNNING;
             }
 
-            FB_Clear();
+            FB_clear();
 
             GAME_UpdateHorizon(&horizon);
 
-            FB_drawImage(30, 22, cactus1, 5, 8);
-            FB_drawImage(36, 22, cactus2, 5, 8);
-            FB_drawImage(70, 21, cactus3, 6, 9);
-            FB_drawImage(100, 17, cactus4, 8, 13);
-
-            /* PTERODACTYL BEGIN */
-            if (pterodactyl_x_delta + PTERODACTYL_WIDTH > 0)
-                pterodactyl_x_delta -= game_speed;
-            else
-                pterodactyl_x_delta = WIDTH; //TODO change to random walue
-            pterodactyl.x = floor(pterodactyl_x_delta);
-
-            if (++flapping_counter >= PTERODACTYL_WING_SWAP)
-            {
-
-                flapping_counter = 0;
-
-                if (pterodactyl_wing)
-                {
-                    pterodactyl.sprite = pterodactyl1;
-                    pterodactyl_wing = 0;
-                } else
-                {
-                    pterodactyl.sprite = pterodactyl2;
-                    pterodactyl_wing = 1;
-                }
-            }
-            FB_drawGameObject(pterodactyl);
-            /* PTERODACTYL END */
+            GAME_UpdatePterodactyl(&pterodactyl);
 
             if (trex_state == RUNNING)
             {
