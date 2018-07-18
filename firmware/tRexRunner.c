@@ -18,8 +18,8 @@
 #define BUTTON_INPORT           CONCAT_EXP(PIN, BUTTON_IOPORTNAME)
 #define BUTTON_DDRPORT          CONCAT_EXP(DDR, BUTTON_IOPORTNAME)
 
-#define left_button()           (!(BUTTON_INPORT & (1 << LEFT_BUTTON_BIT)))
-#define right_button()           (!(BUTTON_INPORT & (1 << RIGHT_BUTTON_BIT)))
+#define left_button_state()     (!(BUTTON_INPORT & (1 << LEFT_BUTTON_BIT)))
+#define right_button_state()    (!(BUTTON_INPORT & (1 << RIGHT_BUTTON_BIT)))
 
 static uint8_t frame_buffer[WIDTH * HEIGHT / 8];
 volatile uint16_t global_clock = 0;
@@ -125,6 +125,45 @@ void TIMER_init(void)
     TIMSK1 |= (1 << OCIE1A); // Timer/Counter1 Output Compare Match A Interrupt Enable
 }
 
+void BUTTONS_init()
+{
+    BUTTON_OUTPORT |= (1 << LEFT_BUTTON_BIT); // pull up LEFT_BUTTON_IO
+    BUTTON_DDRPORT &= ~(1 << LEFT_BUTTON_BIT); // configure LEFT_BUTTON_IO as input
+
+    BUTTON_OUTPORT |= (1 << RIGHT_BUTTON_BIT); // pull up the RIGHT_BUTTON_IO
+    BUTTON_DDRPORT &= ~(1 << RIGHT_BUTTON_BIT); // configure RIGHT_BUTTON_IO as input
+}
+
+void BUTTONS_monitorButtons(uint8_t *buttons_state)
+{
+    cli();
+    if (lb_debounce_clock >= DEBOUNCE_INTERVAL)
+    {
+        lb_debounce_clock = 0;
+        if (left_button_state())
+            *buttons_state |= (1 << LEFT_BUTTON_BIT);
+        else
+            *buttons_state &= ~(1 << LEFT_BUTTON_BIT);
+    } else if ((*buttons_state & (1 << LEFT_BUTTON_BIT)) == left_button_state())
+    {
+        lb_debounce_clock = 0;
+    }
+
+    if (rb_debounce_clock >= DEBOUNCE_INTERVAL)
+    {
+        rb_debounce_clock = 0;
+        if (right_button_state())
+            *buttons_state |= (1 << RIGHT_BUTTON_BIT);
+        else
+            *buttons_state &= ~(1 << RIGHT_BUTTON_BIT);
+    } else if ((*buttons_state & (1 << RIGHT_BUTTON_BIT)) == right_button_state())
+    {
+        rb_debounce_clock = 0;
+    }
+    sei();
+
+}
+
 /*
  * Timer1 "Compare Match" ISR
  */
@@ -186,17 +225,11 @@ void FB_drawGameObject(game_object_t game_object)
 
 int main(void)
 {
+    BUTTONS_init();
     TIMER_init();
     sei();
     SSD1306_init();
     SSD1306_clear();
-
-    // init buttons
-    BUTTON_OUTPORT |= (1 << LEFT_BUTTON_BIT); // pull up LEFT_BUTTON_IO
-    BUTTON_DDRPORT &= ~(1 << LEFT_BUTTON_BIT); // configure LEFT_BUTTON_IO as input
-
-    BUTTON_OUTPORT |= (1 << RIGHT_BUTTON_BIT); // pull up the RIGHT_BUTTON_IO
-    BUTTON_DDRPORT &= ~(1 << RIGHT_BUTTON_BIT); // configure RIGHT_BUTTON_IO as input
 
     game_object_t horizon = {
         WIDTH,
@@ -235,32 +268,7 @@ int main(void)
 
     while (1)
     {
-        /* HANDLE BUTTONS */
-        cli();
-        if (lb_debounce_clock >= DEBOUNCE_INTERVAL)
-        {
-            lb_debounce_clock = 0;
-            if (!(PIND & (1 << PD0)))
-                button_state |= (1 << PD0);
-            else
-                button_state &= ~(1 << PD0);
-        } else if ((button_state & (1 << PD0)) == !(PIND & (1 << PD0)))
-        {
-            lb_debounce_clock = 0;
-        }
-
-        if (rb_debounce_clock >= DEBOUNCE_INTERVAL)
-        {
-            rb_debounce_clock = 0;
-            if (!(PIND & (1 << PD1)))
-                button_state |= (1 << PD1);
-            else
-                button_state &= ~(1 << PD1);
-        } else if ((button_state & (1 << PD1)) == !(PIND & (1 << PD1)))
-        {
-            rb_debounce_clock = 0;
-        }
-        sei();
+        BUTTONS_monitorButtons(&button_state);
 
         /* UPDATE GAME */
         if (global_clock >= RENDER_PERIOD)
