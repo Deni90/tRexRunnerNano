@@ -42,7 +42,7 @@
 #define RIGHT_BUTTON_BIT        1
 
 typedef enum trex_states_e {
-    CRASHED = 0, DUCKING, JUMPING, RUNNING, WAITING
+    WAITING = 0, RUNNING, DUCKING, JUMPING, CRASHED
 } trex_states_t;
 
 typedef struct game_object_s {
@@ -59,5 +59,10 @@ void FB_drawGameObject(game_object_t game_object);
 
 void GAME_UpdateHorizon(game_object_t *horizon);
 void GAME_UpdatePterodactyl(game_object_t *pterodactyl);
+void GAME_UpdateRunningTrex(game_object_t *trex);
+void GAME_UpdateDuckingTrex(game_object_t *trex);
+void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state);
+void GAME_UpdateChrashedTrex(game_object_t *trex);
+void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state);
 
 #endif /* TREXRUNNER_H_ */

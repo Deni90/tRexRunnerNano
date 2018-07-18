@@ -27,6 +27,8 @@ volatile uint8_t lb_debounce_clock = 0;
 volatile uint8_t rb_debounce_clock = 0;
 volatile uint16_t test_clock = 0;
 
+uint8_t button_state = 0x00;
+
 float game_speed = GAME_INITIAL_SPEED;
 
 //128x3
@@ -262,7 +264,118 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
     FB_drawGameObject(*pterodactyl);
 }
 
+void GAME_UpdateRunningTrex(game_object_t *trex)
+{
+    static uint16_t running_counter = 0;
 
+    trex->y = HEIGHT - TREX_STANDING_HEIGHT - 1;
+    trex->width = TREX_STANDING_WIDTH;
+    trex->height = TREX_STANDING_HEIGHT;
+
+    if (++running_counter >= TREX_RUNNING_SPEED)
+    {
+        running_counter = 0;
+        if (trex->sprite == trex_running1)
+        {
+            trex->sprite = trex_running2;
+        } else
+        {
+            trex->sprite = trex_running1;
+        }
+    }
+}
+
+void GAME_UpdateDuckingTrex(game_object_t *trex)
+{
+    static uint16_t running_counter = 0;
+
+    trex->y = HEIGHT - TREX_DUCKING_HEIGHT - 1;
+    trex->width = TREX_DUCKING_WIDTH;
+    trex->height = TREX_DUCKING_HEIGHT;
+
+    if (++running_counter >= TREX_RUNNING_SPEED)
+    {
+        running_counter = 0;
+        if (trex->sprite == trex_ducking1)
+        {
+            trex->sprite = trex_ducking2;
+        } else
+        {
+            trex->sprite = trex_ducking1;
+        }
+    }
+}
+
+void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state)
+{
+    static uint8_t jump_max_y_reached = 0;
+    static float trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
+
+    trex->width = TREX_STANDING_WIDTH;
+    trex->height = TREX_STANDING_HEIGHT;
+    trex->sprite = trex_standing_init;
+
+    /* jump up */
+    if (!jump_max_y_reached
+            && trex->y >= (HEIGHT - TREX_MAX_JUMP_HEIGHT))
+    {
+        trex_y_delta -= JUMPING_SPEED;
+        trex->y = floor(trex_y_delta);
+    } else
+        jump_max_y_reached = 1;
+
+    /* let gravity do the landing */
+    if (jump_max_y_reached
+            && trex->y <= (HEIGHT - TREX_STANDING_HEIGHT - 2))
+    {
+        trex_y_delta += GAME_GRAVITY;
+        trex->y = floor(trex_y_delta);
+    }
+
+    //next state running
+    if (jump_max_y_reached
+            && trex->y > (HEIGHT - TREX_STANDING_HEIGHT - 2))
+    {
+        trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
+        if (button_state & (1 << PD1))
+        {
+            *trex_state = DUCKING;
+        } else
+        {
+            *trex_state = RUNNING;
+        }
+        jump_max_y_reached = 0;
+    }
+}
+
+void GAME_UpdateChrashedTrex(game_object_t *trex)
+{
+
+}
+
+void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
+{
+    switch(*trex_state)
+    {
+    case WAITING:
+        // TODO implement me
+        break;
+    case RUNNING:
+        GAME_UpdateRunningTrex(trex);
+        break;
+    case DUCKING:
+        GAME_UpdateDuckingTrex(trex);
+        break;
+    case JUMPING:
+        GAME_UpdateJumpingTrex(trex, trex_state);
+        break;
+    case CRASHED:
+        GAME_UpdateChrashedTrex(trex);
+        break;
+    }
+
+    FB_drawGameObject(*trex);
+}
 
 // TODO turning on
 // TODO battery monitor
@@ -299,12 +412,10 @@ int main(void)
         TREX_STANDING_HEIGHT,
         trex_running1
     };
-    trex_states_t trex_state = RUNNING;
-    uint8_t trex_running_leg = 0;
-    unsigned int running_counter = 0;
-    float trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
-    uint8_t jump_max_y_reached = 0;
 
+    trex_states_t trex_state = RUNNING;
+
+    //TODO change me
     game_object_t pterodactyl = {
         WIDTH, //TODO change me
         15,
@@ -313,17 +424,15 @@ int main(void)
         pterodactyl1
     };
 
-    uint8_t button_state = 0x00;
-
     while (1)
     {
         BUTTONS_monitorButtons(&button_state);
 
-        /* UPDATE GAME */
         if (global_clock >= RENDER_PERIOD)
         {
             global_clock = 0;
 
+            /* UPDATE GAME */
             if (button_state & (1 << PD0))
             {
                 trex_state = JUMPING;
@@ -342,80 +451,8 @@ int main(void)
 
             GAME_UpdatePterodactyl(&pterodactyl);
 
-            if (trex_state == RUNNING)
-            {
-                trex.y = HEIGHT - TREX_STANDING_HEIGHT - 1;
-                trex.width = TREX_STANDING_WIDTH;
-                trex.height = TREX_STANDING_HEIGHT;
-                if (++running_counter >= TREX_RUNNING_SPEED)
-                {
-                    running_counter = 0;
-                    if (trex_running_leg)
-                    {
-                        trex_running_leg = 0;
-                        trex.sprite = trex_running2;
-                    } else
-                    {
-                        trex_running_leg = 1;
-                        trex.sprite = trex_running1;
-                    }
-                }
-            } else if (trex_state == DUCKING)
-            {
-                trex.y = HEIGHT - TREX_DUCKING_HEIGHT - 1;
-                trex.width = TREX_DUCKING_WIDTH;
-                trex.height = TREX_DUCKING_HEIGHT;
-                if (++running_counter >= TREX_RUNNING_SPEED)
-                {
-                    running_counter = 0;
-                    if (trex_running_leg)
-                    {
-                        trex_running_leg = 0;
-                        trex.sprite = trex_ducking1;
-                    } else
-                    {
-                        trex_running_leg = 1;
-                        trex.sprite = trex_ducking2;
-                    }
-                }
-            } else if (trex_state == JUMPING)
-            {
-                trex.width = TREX_STANDING_WIDTH;
-                trex.height = TREX_STANDING_HEIGHT;
-                trex.sprite = trex_standing_init;
+            GAME_UpdateTrex(&trex, &trex_state);
 
-                /* jump up */
-                if (!jump_max_y_reached
-                        && trex.y >= (HEIGHT - TREX_MAX_JUMP_HEIGHT))
-                {
-                    trex_y_delta -= JUMPING_SPEED;
-                    trex.y = floor(trex_y_delta);
-                } else
-                    jump_max_y_reached = 1;
-
-                /* let gravity do the landing */
-                if (jump_max_y_reached
-                        && trex.y <= (HEIGHT - TREX_STANDING_HEIGHT - 2))
-                {
-                    trex_y_delta += GAME_GRAVITY;
-                    trex.y = floor(trex_y_delta);
-                }
-
-                //next state running
-                if (jump_max_y_reached
-                        && trex.y > (HEIGHT - TREX_STANDING_HEIGHT - 2))
-                {
-                    if (button_state & (1 << PD1))
-                    {
-                        trex_state = DUCKING;
-                    } else
-                    {
-                        trex_state = RUNNING;
-                    }
-                    jump_max_y_reached = 0;
-                }
-            }
-            FB_drawGameObject(trex);
             /* RENDER */
             SSD1306_display(frame_buffer);
         }
