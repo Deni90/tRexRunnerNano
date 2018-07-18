@@ -32,7 +32,7 @@
 #define TREX_MAX_JUMP_HEIGHT    (HEIGHT - 2)
 
 #define GAME_GRAVITY            1.1f
-#define GAME_SPEED              1.0f
+#define GAME_INITIAL_SPEED      1.0f
 #define JUMPING_SPEED           1.05f
 
 #define DEBOUNCE_INTERVAL       50

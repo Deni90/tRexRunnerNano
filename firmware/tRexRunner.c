@@ -26,6 +26,9 @@ volatile uint16_t global_clock = 0;
 volatile uint8_t lb_debounce_clock = 0;
 volatile uint8_t rb_debounce_clock = 0;
 volatile uint16_t test_clock = 0;
+
+float game_speed = GAME_INITIAL_SPEED;
+
 //128x3
 static const __flash uint8_t horizon_line[] =
 {
@@ -205,6 +208,27 @@ void FB_drawImage(int8_t x, int8_t y, const __flash uint8_t* image, uint8_t widt
     }
 }
 
+void GAME_UpdateHorizon(game_object_t *horizon)
+{
+    static float horizon_delta = 0;
+
+    FB_drawGameObject(*horizon);
+    if (horizon_delta < 0)
+    {
+        game_object_t new_horizon = *horizon;
+        new_horizon.x = WIDTH + horizon->x;
+        FB_drawGameObject(new_horizon);
+    }
+    if (horizon_delta + 128 > 0)
+    {
+        horizon_delta -= game_speed;
+    } else
+    {
+        horizon_delta = 0;
+    }
+    horizon->x = floor(horizon_delta);
+}
+
 void FB_drawGameObject(game_object_t game_object)
 {
     FB_drawImage(game_object.x, game_object.y, game_object.sprite,
@@ -289,23 +313,7 @@ int main(void)
 
             FB_Clear();
 
-            /* HORIZONT LINE BEGIN*/
-            FB_drawImage(horizon.x, horizon.y, horizon.sprite, horizon.width,
-                    horizon.height);
-            if (horizon_delta < 0)
-            {
-                FB_drawImage(WIDTH + horizon.x, horizon.y, horizon.sprite,
-                        horizon.width, horizon.height);
-            }
-            if (horizon_delta + 128 > 0)
-            {
-                horizon_delta -= GAME_SPEED;
-            } else
-            {
-                horizon_delta = 0;
-            }
-            horizon.x = floor(horizon_delta);
-            /* HORIZONT LINE END*/
+            GAME_UpdateHorizon(&horizon);
 
             FB_drawImage(30, 22, cactus1, 5, 8);
             FB_drawImage(36, 22, cactus2, 5, 8);
@@ -314,7 +322,7 @@ int main(void)
 
             /* PTERODACTYL BEGIN */
             if (pterodactyl_x_delta + PTERODACTYL_WIDTH > 0)
-                pterodactyl_x_delta -= GAME_SPEED;
+                pterodactyl_x_delta -= game_speed;
             else
                 pterodactyl_x_delta = WIDTH; //TODO change to random walue
             pterodactyl.x = floor(pterodactyl_x_delta);
