@@ -27,6 +27,7 @@ static uint8_t frame_buffer[WIDTH * HEIGHT / 8];
 volatile uint16_t global_clock = 0;
 volatile uint8_t lb_debounce_clock = 0;
 volatile uint8_t rb_debounce_clock = 0;
+volatile uint16_t game_speed_update_clock = 0;
 volatile uint16_t test_clock = 0;
 
 volatile uint32_t seed = 0;
@@ -181,6 +182,7 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
     global_clock++;
     lb_debounce_clock++;
     rb_debounce_clock++;
+    game_speed_update_clock++;
     test_clock++;
     seed++;
 }
@@ -574,6 +576,13 @@ int main(void)
 
             /* RENDER */
             SSD1306_display(frame_buffer);
+        }
+
+        // speed up the game periodically
+        if(game_speed_update_clock >= GAME_SPEED_UPDATE_TIME)
+        {
+            game_speed_update_clock = 0;
+            game_speed += GAME_SPEED_DELTA;
         }
     }
 }

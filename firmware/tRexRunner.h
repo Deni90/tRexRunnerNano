@@ -43,6 +43,8 @@
 
 #define GAME_GRAVITY            1.1f
 #define GAME_INITIAL_SPEED      0.5f
+#define GAME_SPEED_DELTA        0.001f
+#define GAME_SPEED_UPDATE_TIME  250 //mS
 #define JUMPING_SPEED           1.05f
 
 #define DEBOUNCE_INTERVAL       50
