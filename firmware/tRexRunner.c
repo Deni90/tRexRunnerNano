@@ -279,7 +279,6 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
 
 void GAME_CreateCactus(game_object_t *cactus)
 {
-
     uint8_t cactus_type = rand() % CACTUS_NUMBER_OF_SPECIES;
 
     cactus->x = WIDTH;
@@ -298,12 +297,17 @@ void GAME_CreateCactus(game_object_t *cactus)
         cactus->height = 8;
         break;
     case 2:
+        cactus->sprite = cactus3;
+        cactus->width = 6;
+        cactus->height = 9;
+        break;
+    case 3:
         cactus->sprite = cactus4;
         cactus->width = 8;
         cactus->height = 13;
         break;
     default:
-        cactus->sprite = cactus4;
+        cactus->sprite = cactus3;
         cactus->width = 6;
         cactus->height = 9;
     }
@@ -445,6 +449,8 @@ void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
 // TODO random cactus and pterodactyl generation
 // TODO fix trex ducking glitch
 // TODO add clearence between trex and horizon
+
+#include <util/delay.h>
 
 int main(void)
 {

@@ -34,7 +34,7 @@
 #define TREX_RUNNING_SPEED      8
 #define TREX_MAX_JUMP_HEIGHT    (HEIGHT - 2)
 
-#define CACTUS_NUMBER_OF_SPECIES        3
+#define CACTUS_NUMBER_OF_SPECIES        4
 #define CACTUS_PADDING_BOTTOM           2
 
 #define GAME_GRAVITY            1.1f
