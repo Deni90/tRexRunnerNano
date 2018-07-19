@@ -34,8 +34,12 @@
 #define TREX_RUNNING_SPEED      8
 #define TREX_MAX_JUMP_HEIGHT    (HEIGHT - 2)
 
+#define CACTUS_MAX_COUNT                2
 #define CACTUS_NUMBER_OF_SPECIES        4
 #define CACTUS_PADDING_BOTTOM           2
+#define CACTUS_RESPAWN_BASE_DELAY       50  // frames
+#define CACTUS_RESPAWN_MAX_DELAY        150 // frames
+
 
 #define GAME_GRAVITY            1.1f
 #define GAME_INITIAL_SPEED      0.5f
@@ -46,6 +50,9 @@
 #define BUTTON_IOPORTNAME       D
 #define LEFT_BUTTON_BIT         0
 #define RIGHT_BUTTON_BIT        1
+
+#define TRUE                    1
+#define FALSE                   0
 
 typedef enum trex_states_e {
     WAITING = 0, RUNNING, DUCKING, JUMPING, CRASHED
@@ -58,6 +65,7 @@ typedef struct game_object_s {
     uint8_t height;
     const uint8_t *sprite;
     float delta;
+    uint8_t visible;
 } game_object_t;
 
 void FB_clear();
@@ -71,6 +79,7 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl);
 
 void GAME_CreateCactus(game_object_t *cactus);
 void GAME_UpdateCactus(game_object_t *cactus);
+uint8_t GAME_CountVisibleCactuses(game_object_t cactus[]);
 
 void GAME_UpdateRunningTrex(game_object_t *trex);
 void GAME_UpdateDuckingTrex(game_object_t *trex);
