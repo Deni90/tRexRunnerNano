@@ -40,6 +40,7 @@
 #define CACTUS_RESPAWN_BASE_DELAY       50  // frames
 #define CACTUS_RESPAWN_MAX_DELAY        150 // frames
 
+#define SHOW_PTERODACTYL                190
 
 #define GAME_GRAVITY                    1.1f
 #define GAME_INITIAL_SPEED              0.5f
@@ -76,6 +77,7 @@ void FB_DrawGameObject(game_object_t game_object);
 
 void GAME_UpdateHorizon(game_object_t *horizon);
 
+void GAME_InitPrerodactyl(game_object_t *pterodactyl);
 void GAME_CreatePterodactyl(game_object_t *pterodactyl);
 void GAME_UpdatePterodactyl(game_object_t *pterodactyl);
 

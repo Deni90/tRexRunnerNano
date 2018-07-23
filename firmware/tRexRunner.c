@@ -242,6 +242,16 @@ void GAME_UpdateHorizon(game_object_t *horizon)
     horizon->x = floor(horizon->delta);
 }
 
+void GAME_InitPrerodactyl(game_object_t *pterodactyl)
+{
+    pterodactyl->sprite = pterodactyl1;
+    pterodactyl->x = 0 - PTERODACTYL_WIDTH;
+    pterodactyl->y = 0 - PTERODACTYL_HEIGHT;
+    pterodactyl->width = PTERODACTYL_WIDTH;
+    pterodactyl->height = PTERODACTYL_HEIGHT;
+    pterodactyl->visible = TRUE;
+}
+
 void GAME_CreatePterodactyl(game_object_t *pterodactyl)
 {
     uint8_t range = PTERODACTYL_MIN_FLY_HEIGHT - PTERODACTYL_MAX_FLY_HEIGHT;
@@ -257,6 +267,9 @@ void GAME_CreatePterodactyl(game_object_t *pterodactyl)
 void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
 {
     static unsigned int flapping_counter = 0;
+
+    if(!pterodactyl->visible)
+        return;
 
     // move to the left in small steps
     if (pterodactyl->delta + pterodactyl->width > 0)
@@ -471,7 +484,6 @@ void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
 // TODO score + highscore
 // TODO collision detection
 // TODO game over
-// TODO random pterodactyl generation
 // TODO fix trex ducking glitch
 // TODO add clearence between trex and horizon
 
@@ -512,12 +524,16 @@ int main(void)
     uint8_t latest_cactus = 0; // index of the newest cactus in the array
     uint16_t cactus_respawn_delay = 0;
 
+    game_object_t pterodactyl;
+    uint16_t pterodactyl_respawn_delay = 65535;
+    uint8_t respawn_pterodactyl = FALSE;
 //    while(!button_state)
 //    {
 //        BUTTONS_monitorButtons(&button_state);
 //    }
     srand(seed);    // initialize PRNG
 
+    GAME_InitPrerodactyl(&pterodactyl);
     while (1)
     {
         BUTTONS_monitorButtons(&button_state);
@@ -544,15 +560,22 @@ int main(void)
 
             GAME_UpdateHorizon(&horizon);
 
-            // create new cactuses
+            // create new obstacles
             if(GAME_CountVisibleCactuses(cactus) <= CACTUS_MAX_COUNT)
             {
                 // time for creating new cactus?
                 if(cactus[latest_cactus].visible == FALSE && cactus_respawn_delay == 0)
                 {
                     GAME_CreateCactus(&cactus[latest_cactus]);
+                    // update delar for creating new one
                     cactus_respawn_delay = CACTUS_RESPAWN_BASE_DELAY + rand() % CACTUS_RESPAWN_MAX_DELAY;
                     latest_cactus++;
+                    if(cactus_respawn_delay >= SHOW_PTERODACTYL && !pterodactyl.visible)
+                    {
+                        pterodactyl_respawn_delay = cactus_respawn_delay / 2;
+                        respawn_pterodactyl = TRUE;
+                    }
+
                 }
 
                 if(latest_cactus == CACTUS_MAX_COUNT)
@@ -561,9 +584,20 @@ int main(void)
                 }
             }
 
+            if(pterodactyl_respawn_delay == 0 && respawn_pterodactyl)
+            {
+                respawn_pterodactyl = FALSE;
+                GAME_CreatePterodactyl(&pterodactyl);
+            }
+
             if(cactus_respawn_delay)
             {
                 cactus_respawn_delay--;
+            }
+
+            if(pterodactyl_respawn_delay)
+            {
+                pterodactyl_respawn_delay--;
             }
 
             // update cactuses
@@ -571,6 +605,8 @@ int main(void)
             {
                 GAME_UpdateCactus(&cactus[i]);
             }
+            // update pterodactyl
+            GAME_UpdatePterodactyl(&pterodactyl);
 
             GAME_UpdateTrex(&trex, &trex_state);
 
