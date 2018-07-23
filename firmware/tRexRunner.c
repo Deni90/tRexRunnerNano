@@ -124,6 +124,28 @@ static const __flash uint8_t cactus4[] =
     0x00, 0x01, 0x01, 0x1f, 0x1f, 0x01, 0x01, 0x00
 };
 
+//4x6 digits
+static const __flash uint8_t digits[] =
+{
+    0x00, 0x1f, 0x11, 0x1f, // '0'
+    0x00, 0x00, 0x00, 0x1f, // '1'
+    0x00, 0x1d, 0x15, 0x17, // '2'
+    0x00, 0x15, 0x15, 0x1f, // '3'
+    0x00, 0x07, 0x04, 0x1f, // '4'
+    0x00, 0x17, 0x15, 0x1d, // '5'
+    0x00, 0x1f, 0x15, 0x1d, // '6'
+    0x00, 0x01, 0x01, 0x1f, // '7'
+    0x00, 0x1f, 0x15, 0x1f, // '8'
+    0x00, 0x17, 0x15, 0x1f, // '9'
+};
+
+//8x6
+static const __flash uint8_t hi_score_str[] =
+{
+    0x00, 0x1f, 0x04, 0x1f,   // 'H'
+    0x00, 0x11, 0x1f, 0x11,   // 'I'
+};
+
 /*
  * Initialize Timer1
  */
@@ -214,6 +236,15 @@ void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t wi
              frame_buffer[buffer_index]&=~(1 << (h % 8));
              }*/
         }
+    }
+}
+
+void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value)
+{
+    int16_t xx = x;
+    for (uint32_t dividend = 10000; dividend > 0; dividend /= 10) {
+        FB_DrawImage(xx, y, &digits[(value / dividend % 10) * DIGIT_WIDTH], DIGIT_WIDTH, DIGIT_HEIGHT);
+        xx += DIGIT_WIDTH;
     }
 }
 
@@ -476,12 +507,18 @@ void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
     FB_DrawGameObject(*trex);
 }
 
+void GAME_ShowScore(uint32_t high_score, uint32_t score)
+{
+    FB_DrawImage(WIDTH - DIGIT_WIDTH * 13, 0, hi_score_str, 8, 6);
+    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 11, 0, high_score);
+    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 5 - 1, 0, score);
+}
+
 // TODO turning on
 // TODO battery monitor
 // TODO inactivity monitor
 
 // TODO start game animation
-// TODO score + highscore
 // TODO collision detection
 // TODO game over
 // TODO fix trex ducking glitch
@@ -527,6 +564,9 @@ int main(void)
     game_object_t pterodactyl;
     uint16_t pterodactyl_respawn_delay = 65535;
     uint8_t respawn_pterodactyl = FALSE;
+
+    uint32_t high_score = 0; //TODO read from eeprom
+    uint32_t score = 0;
 //    while(!button_state)
 //    {
 //        BUTTONS_monitorButtons(&button_state);
@@ -557,6 +597,8 @@ int main(void)
             }
 
             FB_Clear();
+
+            GAME_ShowScore(high_score, score);
 
             GAME_UpdateHorizon(&horizon);
 
@@ -615,10 +657,12 @@ int main(void)
         }
 
         // speed up the game periodically
-        if(game_speed_update_clock >= GAME_SPEED_UPDATE_TIME)
+        if(game_speed_update_clock >= GAME_SCORE_INCREMENT)
         {
             game_speed_update_clock = 0;
-            game_speed += GAME_SPEED_DELTA;
+            score++;
+            if((score % 100) == 0)
+                game_speed += GAME_SPEED_DELTA;
         }
     }
 }

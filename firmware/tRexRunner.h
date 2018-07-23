@@ -44,9 +44,12 @@
 
 #define GAME_GRAVITY                    1.1f
 #define GAME_INITIAL_SPEED              0.5f
-#define GAME_SPEED_DELTA                0.001f
-#define GAME_SPEED_UPDATE_TIME          250 //mS
+#define GAME_SPEED_DELTA                0.02f
 #define JUMPING_SPEED                   1.05f
+#define GAME_SCORE_INCREMENT            100 // mS
+
+#define DIGIT_WIDTH                     4
+#define DIGIT_HEIGHT                    6
 
 #define DEBOUNCE_INTERVAL               50
 
@@ -73,6 +76,7 @@ typedef struct game_object_s {
 
 void FB_Clear();
 void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);
+void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value);
 void FB_DrawGameObject(game_object_t game_object);
 
 void GAME_UpdateHorizon(game_object_t *horizon);
