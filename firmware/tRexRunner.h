@@ -16,7 +16,7 @@
 #define RENDER_PERIOD                   10 // 100 FPS
 
 #define HORIZON_LINE_WIDTH              WIDTH
-#define HORIZON_LINE_HEIGHT             3
+#define HORIZON_LINE_HEIGHT             2
 
 #define TREX_STANDING_WIDTH             14
 #define TREX_STANDING_HEIGHT            14
@@ -78,6 +78,7 @@ void FB_Clear();
 void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);
 void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value);
 void FB_DrawGameObject(game_object_t game_object);
+void FB_ClearPixel(int16_t x, int16_t y, uint8_t width, uint8_t height);
 
 void GAME_UpdateHorizon(game_object_t *horizon);
 
