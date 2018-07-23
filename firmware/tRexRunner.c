@@ -187,20 +187,20 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
     seed++;
 }
 
-void FB_clear()
+void FB_Clear()
 {
     memset(frame_buffer, 0, sizeof(uint8_t) * (WIDTH * HEIGHT / 8));
 }
 
-void FB_drawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height)
+void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height)
 {
-    for(int h = y; h < (y + height); h++)
+    for(int16_t h = y; h < (y + height); h++)
     {
-        for(int w = x; w < (x + width); w++)
+        for(int16_t w = x; w < (x + width); w++)
         {
-            if((w >= SSD1306_LCDWIDTH) || (h >= SSD1306_LCDHEIGHT)) continue;
+            if((w >= WIDTH) || (h >= HEIGHT)) continue;
             if( h < 0 || w < 0 ) continue;
-            uint16_t buffer_index = SSD1306_LCDWIDTH * (h / 8) + w;
+            uint16_t buffer_index = WIDTH * (h / 8) + w;
             uint8_t image_w = w - x;
             uint8_t image_h = h - y;
             uint16_t image_index = width * (image_h / 8) + image_w;
@@ -217,20 +217,20 @@ void FB_drawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t wi
     }
 }
 
-void FB_drawGameObject(game_object_t game_object)
+void FB_DrawGameObject(game_object_t game_object)
 {
-    FB_drawImage(game_object.x, game_object.y, game_object.sprite,
+    FB_DrawImage(game_object.x, game_object.y, game_object.sprite,
             game_object.width, game_object.height);
 }
 
 void GAME_UpdateHorizon(game_object_t *horizon)
 {
-    FB_drawGameObject(*horizon);
+    FB_DrawGameObject(*horizon);
     if (horizon->delta < 0)
     {
         game_object_t new_horizon = *horizon;
         new_horizon.x = WIDTH + horizon->x;
-        FB_drawGameObject(new_horizon);
+        FB_DrawGameObject(new_horizon);
     }
     if (horizon->delta + 128 > 0)
     {
@@ -282,7 +282,7 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
             pterodactyl->sprite = pterodactyl1;
         }
     }
-    FB_drawGameObject(*pterodactyl);
+    FB_DrawGameObject(*pterodactyl);
 }
 
 void GAME_CreateCactus(game_object_t *cactus)
@@ -336,7 +336,7 @@ void GAME_UpdateCactus(game_object_t *cactus)
     }
 
     cactus->x = floor(cactus->delta);
-    FB_drawGameObject(*cactus);
+    FB_DrawGameObject(*cactus);
 }
 
 uint8_t GAME_CountVisibleCactuses(game_object_t cactus[])
@@ -423,7 +423,7 @@ void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state)
             && trex->y > (HEIGHT - TREX_STANDING_HEIGHT - 2))
     {
         trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
-        if (button_state & (1 << PD1))
+        if (button_state & (1 << RIGHT_BUTTON_BIT))
         {
             *trex_state = DUCKING;
         } else
@@ -460,7 +460,7 @@ void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
         break;
     }
 
-    FB_drawGameObject(*trex);
+    FB_DrawGameObject(*trex);
 }
 
 // TODO turning on
@@ -528,11 +528,11 @@ int main(void)
             global_clock = 0;
 
             /* UPDATE GAME */
-            if (button_state & (1 << PD0))
+            if (button_state & (1 << LEFT_BUTTON_BIT))
             {
                 trex_state = JUMPING;
             }
-            if ((button_state & (1 << PD1)) && (trex_state != JUMPING))
+            if ((button_state & (1 << RIGHT_BUTTON_BIT)) && (trex_state != JUMPING))
             {
                 trex_state = DUCKING;
             } else if (trex_state != JUMPING)
@@ -540,7 +540,7 @@ int main(void)
                 trex_state = RUNNING;
             }
 
-            FB_clear();
+            FB_Clear();
 
             GAME_UpdateHorizon(&horizon);
 
