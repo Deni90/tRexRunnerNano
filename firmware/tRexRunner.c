@@ -584,6 +584,7 @@ int main(void)
 
     game_object_t cactus[CACTUS_MAX_COUNT];
     uint8_t latest_cactus = 0; // index of the newest cactus in the array
+    uint16_t cactus_respawn_max_delay = CACTUS_RESPAWN_MAX_DELAY;
     uint16_t cactus_respawn_delay = 0;
 
     game_object_t pterodactyl;
@@ -635,7 +636,7 @@ int main(void)
                 {
                     GAME_CreateCactus(&cactus[latest_cactus]);
                     // update delar for creating new one
-                    cactus_respawn_delay = CACTUS_RESPAWN_BASE_DELAY + rand() % CACTUS_RESPAWN_MAX_DELAY;
+                    cactus_respawn_delay = CACTUS_RESPAWN_BASE_DELAY + rand() % cactus_respawn_max_delay;
                     latest_cactus++;
                     if(cactus_respawn_delay >= SHOW_PTERODACTYL && !pterodactyl.visible)
                     {
@@ -687,7 +688,13 @@ int main(void)
             game_speed_update_clock = 0;
             score++;
             if((score % 100) == 0)
+            {
                 game_speed += GAME_SPEED_DELTA;
+                if(cactus_respawn_max_delay >= CACTUS_RESPAWN_MAX_LIMIT)
+                {
+                    cactus_respawn_max_delay -= CACTUS_RESPAWN_DELAY_DECREMENT;
+                }
+            }
         }
     }
 }

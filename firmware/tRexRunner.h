@@ -37,15 +37,17 @@
 #define CACTUS_MAX_COUNT                2
 #define CACTUS_NUMBER_OF_SPECIES        4
 #define CACTUS_PADDING_BOTTOM           2
-#define CACTUS_RESPAWN_BASE_DELAY       50  // frames
-#define CACTUS_RESPAWN_MAX_DELAY        150 // frames
+#define CACTUS_RESPAWN_BASE_DELAY       40  // frames
+#define CACTUS_RESPAWN_MAX_DELAY        200 // frames
+#define CACTUS_RESPAWN_MAX_LIMIT        10  // frames
+#define CACTUS_RESPAWN_DELAY_DECREMENT  5  // frames
 
 #define SHOW_PTERODACTYL                190
 
-#define GAME_GRAVITY                    1.1f
-#define GAME_INITIAL_SPEED              0.5f
-#define GAME_SPEED_DELTA                0.02f
-#define JUMPING_SPEED                   1.05f
+#define GAME_GRAVITY                    0.9f
+#define GAME_INITIAL_SPEED              1.0f
+#define GAME_SPEED_DELTA                0.03f
+#define JUMPING_SPEED                   0.95f
 #define GAME_SCORE_INCREMENT            100 // mS
 
 #define DIGIT_WIDTH                     4
