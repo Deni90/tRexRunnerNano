@@ -494,9 +494,13 @@ void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state)
         if (button_state & (1 << RIGHT_BUTTON_BIT))
         {
             *trex_state = DUCKING;
+            // preload ducking sprite
+            trex->sprite = trex_ducking1;
         } else
         {
             *trex_state = RUNNING;
+            // preload running sprite
+            trex->sprite = trex_running1;
         }
         jump_max_y_reached = 0;
     }
@@ -546,7 +550,6 @@ void GAME_ShowScore(uint32_t high_score, uint32_t score)
 // TODO start game animation
 // TODO collision detection
 // TODO game over
-// TODO fix trex ducking glitch
 
 #include <util/delay.h>
 
@@ -615,9 +618,19 @@ int main(void)
             }
             if ((button_state & (1 << RIGHT_BUTTON_BIT)) && (trex_state != JUMPING))
             {
+                if(trex_state == RUNNING)
+                {
+                    // preload a ducking sprite
+                    trex.sprite = trex_ducking1;
+                }
                 trex_state = DUCKING;
             } else if (trex_state != JUMPING)
             {
+                if(trex_state == DUCKING)
+                {
+                    // preload a running sprite
+                    trex.sprite = trex_running1;
+                }
                 trex_state = RUNNING;
             }
 
@@ -675,6 +688,7 @@ int main(void)
             // update pterodactyl
             GAME_UpdatePterodactyl(&pterodactyl);
 
+            // update trex
             GAME_UpdateTrex(&trex, &trex_state);
 
             /* RENDER */
