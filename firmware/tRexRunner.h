@@ -15,19 +15,7 @@
 
 #define RENDER_PERIOD                   10 // 100 FPS
 
-#define HORIZON_LINE_WIDTH              WIDTH
-#define HORIZON_LINE_HEIGHT             2
-
-#define TREX_STANDING_WIDTH             14
-#define TREX_STANDING_HEIGHT            14
-
-#define TREX_DUCKING_WIDTH              22
-#define TREX_DUCKING_HEIGHT             9
-
-#define PTERODACTYL_WIDTH               11
-#define PTERODACTYL_HEIGHT              10
 #define PTERODACTYL_WING_SWAP           20
-
 #define PTERODACTYL_MIN_FLY_HEIGHT      (HEIGHT - PTERODACTYL_HEIGHT)
 #define PTERODACTYL_MAX_FLY_HEIGHT      (HEIGHT - TREX_STANDING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 
@@ -49,9 +37,6 @@
 #define GAME_SPEED_DELTA                0.03f
 #define JUMPING_SPEED                   0.95f
 #define GAME_SCORE_INCREMENT            100 // mS
-
-#define DIGIT_WIDTH                     4
-#define DIGIT_HEIGHT                    6
 
 #define DEBOUNCE_INTERVAL               50
 
