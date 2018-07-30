@@ -127,11 +127,10 @@ static const __flash uint8_t cactus3[] =
     0x00, 0x00, 0x01, 0x01, 0x00, 0x00
 };
 
-//8x13
+//11x7
 static const __flash uint8_t cactus4[] =
 {
-    0xf0, 0xf8, 0x80, 0xfe, 0xff, 0x80, 0xf0, 0xf8,
-    0x00, 0x01, 0x01, 0x1f, 0x1f, 0x01, 0x01, 0x00
+    0x0c, 0x08, 0x7e, 0x10, 0x1c, 0x00, 0x0e, 0x08, 0x7f, 0x10, 0x1c
 };
 
 //4x6 digits
@@ -381,8 +380,8 @@ void GAME_CreateCactus(game_object_t *cactus)
         break;
     case 3:
         cactus->sprite = cactus4;
-        cactus->width = 8;
-        cactus->height = 13;
+        cactus->width = 11;
+        cactus->height = 7;
         break;
     default:
         cactus->sprite = cactus3;
