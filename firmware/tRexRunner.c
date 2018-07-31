@@ -73,10 +73,9 @@ static const __flash uint8_t trex_running2[] =
     0x01, 0x03, 0x07, 0x3f, 0x2f, 0x07, 0x0f, 0x0b, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 // width & height same as for trex_standing_init
-// FIXME
 static const __flash uint8_t trex_dead[] =
 {
-    0xfc, 0xe0, 0xc0, 0xe0, 0xe0, 0xf0, 0xfe, 0xf5, 0xfd, 0x5f, 0xfb, 0x17, 0x07, 0x06,
+    0xfc, 0xe0, 0xc0, 0xe0, 0xe0, 0xf0, 0xfe, 0xfb, 0xf5, 0x5b, 0xd7, 0x17, 0x07, 0x06,
     0x01, 0x03, 0x07, 0x3f, 0x2f, 0x07, 0x3f, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
@@ -135,7 +134,6 @@ static const __flash uint8_t cactus4[] =
     0x0c, 0x08, 0x7e, 0x10, 0x1c, 0x00, 0x0e, 0x08, 0x7f, 0x10, 0x1c
 };
 
-// 4x6 digits
 #define DIGIT_WIDTH     4
 #define DIGIT_HEIGHT    6
 static const __flash uint8_t digits[] =
@@ -152,7 +150,8 @@ static const __flash uint8_t digits[] =
     0x00, 0x17, 0x15, 0x1f, // '9'
 };
 
-// 8x6
+#define HI_SCORE_STR_WIDTH  8
+#define HI_SCORE_STR_HEIGHT 6
 static const __flash uint8_t hi_score_str[] =
 {
     0x00, 0x1f, 0x04, 0x1f,   // 'H'
@@ -509,7 +508,9 @@ void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state)
 
 void GAME_UpdateChrashedTrex(game_object_t *trex)
 {
-
+    trex->width = TREX_STANDING_WIDTH;
+    trex->height = TREX_STANDING_HEIGHT;
+    trex->sprite = trex_dead;
 }
 
 void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
@@ -539,7 +540,7 @@ void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
 
 void GAME_ShowScore(uint32_t high_score, uint32_t score)
 {
-    FB_DrawImage(WIDTH - DIGIT_WIDTH * 13, 0, hi_score_str, 8, 6);
+    FB_DrawImage(WIDTH - DIGIT_WIDTH * 13, 0, hi_score_str, HI_SCORE_STR_WIDTH, HI_SCORE_STR_HEIGHT);
     FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 11, 0, high_score);
     FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 5 - 1, 0, score);
 }
