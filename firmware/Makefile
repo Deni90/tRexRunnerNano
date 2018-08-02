@@ -1,7 +1,7 @@
 DEVICE  = atmega88
-F_CPU   = 16000000	# in Hz
-FUSE_L  = #TODO
-FUSE_H  = #TODO
+F_CPU   = 8000000      # in Hz
+FUSE_L  = 0xe2
+FUSE_H  = 0xdf
 AVRDUDE = avrdude -c usbasp -p $(DEVICE) # edit this line for your programmer
 
 CFLAGS  = 
