@@ -73,6 +73,7 @@ void GAME_InitPrerodactyl(game_object_t *pterodactyl);
 void GAME_CreatePterodactyl(game_object_t *pterodactyl);
 void GAME_UpdatePterodactyl(game_object_t *pterodactyl);
 
+void GAME_InitCactus(game_object_t *cactus);
 void GAME_CreateCactus(game_object_t *cactus);
 void GAME_UpdateCactus(game_object_t *cactus);
 uint8_t GAME_CountVisibleCactuses(game_object_t cactus[]);
