@@ -75,9 +75,9 @@ typedef struct horizon_s {
 } horizon_t;
 
 void FB_Clear();
-void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);
+uint8_t FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);
 void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value);
-void FB_DrawGameObject(game_object_t game_object);
+uint8_t FB_DrawGameObject(game_object_t game_object);
 void FB_SetPixel(uint8_t x, uint8_t y);
 void FB_ClearPixel(uint8_t x, uint8_t y);
 

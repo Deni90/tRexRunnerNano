@@ -107,8 +107,9 @@ void FB_Clear()
     memset(frame_buffer, 0, sizeof(uint8_t) * (WIDTH * HEIGHT / 8));
 }
 
-void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height)
+uint8_t FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height)
 {
+    uint8_t collision = FALSE;
     for(int16_t h = y; h < (y + height); h++)
     {
         for(int16_t w = x; w < (x + width); w++)
@@ -121,15 +122,13 @@ void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t wi
             uint16_t image_index = width * (image_h / 8) + image_w;
             if((image[image_index] >> (image_h % 8) & 0x01) == 0x01)
             {
+                if(frame_buffer[buffer_index] >> (h % 8) & 0x01)
+                    collision = TRUE;
                 frame_buffer[buffer_index]|=(1 << (h % 8));
             }
-            /* //only apply "or" to buffer
-             else
-             {
-             frame_buffer[buffer_index]&=~(1 << (h % 8));
-             }*/
         }
     }
+    return collision;
 }
 
 void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value)
@@ -141,10 +140,10 @@ void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value)
     }
 }
 
-void FB_DrawGameObject(game_object_t game_object)
+uint8_t FB_DrawGameObject(game_object_t game_object)
 {
     if(!game_object.visible)
-        return;
+        return FALSE;
     FB_DrawImage(game_object.x, game_object.y, game_object.sprite,
             game_object.width, game_object.height);
 }
@@ -463,7 +462,11 @@ void GAME_UpdateTrex(game_object_t *trex)
         break;
     }
 
-    FB_DrawGameObject(*trex);
+
+    if(FB_DrawGameObject(*trex))
+    {
+        trex_state = CRASHED;
+    }
 }
 
 void GAME_ShowScore(uint32_t high_score, uint32_t score)
@@ -478,7 +481,6 @@ void GAME_ShowScore(uint32_t high_score, uint32_t score)
 // TODO inactivity monitor
 
 // TODO start game animation
-// TODO collision detection
 // TODO game over
 
 int main(void)
@@ -538,6 +540,16 @@ int main(void)
     {
         BUTTONS_monitorButtons(&button_state);
 
+        if(trex_state == CRASHED)
+        {
+            if (button_state & (1 << LEFT_BUTTON_BIT))
+            {
+                trex_state = JUMPING;
+                score = 0;
+                //TODO reset the game
+            }
+            continue;
+        }
 
         if (global_clock >= RENDER_PERIOD)
         {
