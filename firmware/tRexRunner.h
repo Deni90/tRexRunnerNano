@@ -61,13 +61,27 @@ typedef struct game_object_s {
     uint8_t visible;
 } game_object_t;
 
+typedef struct horizon_s {
+    int16_t x;
+    int16_t y;
+    uint8_t width;
+    uint8_t height;
+    uint8_t bump1_x;
+    uint8_t bump1_width;
+    float bump1_delta;
+    uint8_t bump2_x;
+    uint8_t bump2_width;
+    float bump2_delta;
+} horizon_t;
+
 void FB_Clear();
 void FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);
 void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value);
 void FB_DrawGameObject(game_object_t game_object);
-void FB_ClearPixel(int16_t x, int16_t y, uint8_t width, uint8_t height);
+void FB_SetPixel(uint8_t x, uint8_t y);
+void FB_ClearPixel(uint8_t x, uint8_t y);
 
-void GAME_UpdateHorizon(game_object_t *horizon);
+void GAME_UpdateHorizon(horizon_t *horizon, game_object_t trex);
 
 void GAME_InitPrerodactyl(game_object_t *pterodactyl);
 void GAME_CreatePterodactyl(game_object_t *pterodactyl);
@@ -80,8 +94,8 @@ uint8_t GAME_CountVisibleCactuses(game_object_t cactus[]);
 
 void GAME_UpdateRunningTrex(game_object_t *trex);
 void GAME_UpdateDuckingTrex(game_object_t *trex);
-void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state);
+void GAME_UpdateJumpingTrex(game_object_t *trex);
 void GAME_UpdateChrashedTrex(game_object_t *trex);
-void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state);
+void GAME_UpdateTrex(game_object_t *trex);
 
 #endif /* TREXRUNNER_H_ */

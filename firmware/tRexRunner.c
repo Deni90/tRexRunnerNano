@@ -33,9 +33,11 @@ volatile uint16_t test_clock = 0;
 
 volatile uint32_t seed = 0;
 
-uint8_t button_state = 0x00;
+static uint8_t button_state = 0x00;
 
-float game_speed = GAME_INITIAL_SPEED;
+static trex_states_t trex_state = RUNNING;
+
+static float game_speed = GAME_INITIAL_SPEED;
 
 /*
  * Initialize Timer1
@@ -147,38 +149,77 @@ void FB_DrawGameObject(game_object_t game_object)
             game_object.width, game_object.height);
 }
 
-void FB_ClearPixel(int16_t x, int16_t y, uint8_t width, uint8_t height)
+void FB_SetPixel(uint8_t x, uint8_t y)
 {
-    for(int16_t h = y; h < (y + height); h++)
-    {
-        for(int16_t w = x; w < (x + width); w++)
-        {
-            if((w >= WIDTH) || (h >= HEIGHT)) continue;
-            if( h < 0 || w < 0 ) continue;
-            uint16_t buffer_index = WIDTH * (h / 8) + w;
+    if((x >= WIDTH) || (y >= HEIGHT)) return;
+    uint16_t buffer_index = WIDTH * (y / 8) + x;
+    frame_buffer[buffer_index] |= (1 << (y % 8));
 
-            frame_buffer[buffer_index]&=~(1 << (h % 8));
-        }
-    }
 }
 
-void GAME_UpdateHorizon(game_object_t *horizon)
+void FB_ClearPixel(uint8_t x, uint8_t y)
 {
-    FB_DrawGameObject(*horizon);
-    if (horizon->delta < 0)
+    if((x >= WIDTH) || (y >= HEIGHT)) return;
+    uint16_t buffer_index = WIDTH * (y / 8) + x;
+    frame_buffer[buffer_index] &= ~(1 << (y % 8));
+
+}
+
+void GAME_UpdateHorizon(horizon_t *horizon, game_object_t trex)
+{
+    for(uint8_t i = horizon->x; i < horizon->width; i++)
     {
-        game_object_t new_horizon = *horizon;
-        new_horizon.x = WIDTH + horizon->x;
-        FB_DrawGameObject(new_horizon);
+        // create some space between trex and horizon
+        if(trex_state == RUNNING &&
+                (i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
+                (i < trex.x + TREX_STANDING_CLEARENCE_MAX))
+            continue;
+        if(trex_state == RUNNING &&
+                (i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
+                (i < trex.x + TREX_STANDING_CLEARENCE_MAX))
+            continue;
+        if(trex_state == JUMPING &&
+                (i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
+                (i < trex.x + TREX_STANDING_CLEARENCE_MAX) &&
+                (trex.y > trex.height))
+            continue;
+        if(trex_state == DUCKING &&
+                (i >= trex.x + TREX_DUCKING_CLEARENCE_MIN) &&
+                (i < trex.x + TREX_DUCKING_CLEARENCE_MAX))
+            continue;
+
+        if(i >= horizon->bump1_x && i < horizon->bump1_x + horizon->bump1_width)
+            // draw first bump
+            FB_SetPixel(i, horizon->y);
+        else if(i >= horizon->bump2_x && i < horizon->bump2_x + horizon->bump2_width)
+             // draw second bump
+            FB_SetPixel(i, horizon->y);
+        else
+            // draw horizon line
+            FB_SetPixel(i, horizon->y + 1);
     }
-    if (horizon->delta + 128 > 0)
+
+    // move bumps
+    if (horizon->bump1_delta - game_speed > 0)
     {
-        horizon->delta -= game_speed;
-    } else
-    {
-        horizon->delta = 0;
+        horizon->bump1_delta -= game_speed;
     }
-    horizon->x = floor(horizon->delta);
+    else
+    {
+        horizon->bump1_delta = horizon->width;
+    }
+    horizon->bump1_x = floor(horizon->bump1_delta);
+
+
+    if (horizon->bump2_delta - game_speed > 0)
+    {
+        horizon->bump2_delta -= game_speed;
+    }
+    else
+    {
+        horizon->bump2_delta = horizon->width;
+    }
+    horizon->bump2_x = floor(horizon->bump2_delta);
 }
 
 void GAME_InitPrerodactyl(game_object_t *pterodactyl)
@@ -348,7 +389,7 @@ void GAME_UpdateDuckingTrex(game_object_t *trex)
     }
 }
 
-void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state)
+void GAME_UpdateJumpingTrex(game_object_t *trex)
 {
     static uint8_t jump_max_y_reached = 0;
     static float trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
@@ -381,12 +422,12 @@ void GAME_UpdateJumpingTrex(game_object_t *trex, trex_states_t *trex_state)
         trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
         if (button_state & (1 << RIGHT_BUTTON_BIT))
         {
-            *trex_state = DUCKING;
+            trex_state = DUCKING;
             // preload ducking sprite
             trex->sprite = trex_ducking1;
         } else
         {
-            *trex_state = RUNNING;
+            trex_state = RUNNING;
             // preload running sprite
             trex->sprite = trex_running1;
         }
@@ -401,22 +442,21 @@ void GAME_UpdateChrashedTrex(game_object_t *trex)
     trex->sprite = trex_dead;
 }
 
-void GAME_UpdateTrex(game_object_t *trex, trex_states_t *trex_state)
+void GAME_UpdateTrex(game_object_t *trex)
 {
-    switch(*trex_state)
+    switch(trex_state)
     {
     case WAITING:
         // TODO implement me
         break;
     case RUNNING:
         GAME_UpdateRunningTrex(trex);
-        FB_ClearPixel(trex->x + 2, HEIGHT - HORIZON_LINE_HEIGHT - 1, trex->width - 7, HORIZON_LINE_HEIGHT);
         break;
     case DUCKING:
         GAME_UpdateDuckingTrex(trex);
         break;
     case JUMPING:
-        GAME_UpdateJumpingTrex(trex, trex_state);
+        GAME_UpdateJumpingTrex(trex);
         break;
     case CRASHED:
         GAME_UpdateChrashedTrex(trex);
@@ -449,18 +489,21 @@ int main(void)
     SSD1306_init();
     SSD1306_clear();
 
-    game_object_t horizon = {
-        WIDTH,
+    horizon_t horizon = {
+        0,
         HEIGHT - HORIZON_LINE_HEIGHT - 1,
         HORIZON_LINE_WIDTH,
         HORIZON_LINE_HEIGHT,
-        horizon_line,
-        0,
-        TRUE
+        HORIZON_LINE_BUMP1_X,
+        HORIZON_LINE_BUMP1_WIDTH,
+        HORIZON_LINE_BUMP1_X,
+        HORIZON_LINE_BUMP2_X,
+        HORIZON_LINE_BUMP2_WIDTH,
+        HORIZON_LINE_BUMP2_X
     };
 
     game_object_t trex = {
-        8,
+        TREX_PADDING_RIGHT,
         HEIGHT - TREX_STANDING_HEIGHT - 1,
         TREX_STANDING_WIDTH,
         TREX_STANDING_HEIGHT,
@@ -469,8 +512,6 @@ int main(void)
         TRUE
 
     };
-
-    trex_states_t trex_state = RUNNING;
 
     game_object_t obstacles[CACTUS_MAX_COUNT + 1]; // last element is pterodactyl
 
@@ -529,7 +570,7 @@ int main(void)
 
             GAME_ShowScore(high_score, score);
 
-            GAME_UpdateHorizon(&horizon);
+            GAME_UpdateHorizon(&horizon, trex);
 
             // create new obstacles
             if(GAME_CountVisibleCactuses(obstacles) <= CACTUS_MAX_COUNT)
@@ -581,7 +622,7 @@ int main(void)
             GAME_UpdatePterodactyl(&obstacles[CACTUS_MAX_COUNT]);
 
             // update trex
-            GAME_UpdateTrex(&trex, &trex_state);
+            GAME_UpdateTrex(&trex);
 
             /* RENDER */
             SSD1306_display(frame_buffer);
