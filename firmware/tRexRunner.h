@@ -81,7 +81,11 @@ uint8_t FB_DrawGameObject(game_object_t game_object);
 void FB_SetPixel(uint8_t x, uint8_t y);
 void FB_ClearPixel(uint8_t x, uint8_t y);
 
-void GAME_UpdateHorizon(horizon_t *horizon, game_object_t trex);
+void GAME_Init();
+void GAME_ShowScore();
+
+void GAME_InitHorizon();
+void GAME_UpdateHorizon();
 
 void GAME_InitPrerodactyl(game_object_t *pterodactyl);
 void GAME_CreatePterodactyl(game_object_t *pterodactyl);
@@ -92,10 +96,11 @@ void GAME_CreateCactus(game_object_t *cactus);
 void GAME_UpdateCactus(game_object_t *cactus);
 uint8_t GAME_CountVisibleCactuses(game_object_t cactus[]);
 
-void GAME_UpdateRunningTrex(game_object_t *trex);
-void GAME_UpdateDuckingTrex(game_object_t *trex);
-void GAME_UpdateJumpingTrex(game_object_t *trex);
-void GAME_UpdateChrashedTrex(game_object_t *trex);
-void GAME_UpdateTrex(game_object_t *trex);
+void GAME_InitTrex();
+void GAME_UpdateRunningTrex();
+void GAME_UpdateDuckingTrex();
+void GAME_UpdateJumpingTrex();
+void GAME_UpdateChrashedTrex();
+void GAME_UpdateTrex();
 
 #endif /* TREXRUNNER_H_ */
