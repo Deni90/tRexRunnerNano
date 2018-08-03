@@ -523,6 +523,8 @@ void GAME_Init()
 {
     high_score = 0; //TODO read from eeprom
     score = 0;
+    game_speed = GAME_INITIAL_SPEED;
+    trex_state = RUNNING;
     latest_cactus = 0; // index of the newest cactus in the array
     cactus_respawn_max_delay = CACTUS_RESPAWN_MAX_DELAY;
     cactus_respawn_delay = 0;
@@ -586,7 +588,6 @@ int main(void)
             {
                 button_released = FALSE;
                 GAME_Init();
-                trex_state = JUMPING;
             }
             continue;
         }
