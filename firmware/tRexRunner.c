@@ -153,7 +153,8 @@ void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value)
 {
     int16_t xx = x;
     for (uint32_t dividend = 10000; dividend > 0; dividend /= 10) {
-        FB_DrawImage(xx, y, &digits[(value / dividend % 10) * DIGIT_WIDTH], DIGIT_WIDTH, DIGIT_HEIGHT);
+        FB_DrawImage(xx, y, &digits[(value / dividend % 10) * DIGIT_WIDTH],
+                DIGIT_WIDTH, DIGIT_HEIGHT);
         xx += DIGIT_WIDTH;
     }
 }
@@ -162,8 +163,8 @@ uint8_t FB_DrawGameObject(game_object_t game_object)
 {
     if(!game_object.visible)
         return FALSE;
-    return FB_DrawImage(game_object.x, game_object.y, game_object.sprite,
-            game_object.width, game_object.height);
+    return FB_DrawImage(floor(game_object.x), floor(game_object.y),
+            game_object.sprite, game_object.width, game_object.height);
 }
 
 void FB_SetPixel(uint8_t x, uint8_t y)
@@ -190,10 +191,8 @@ void GAME_InitHorizon()
     horizon.height = HORIZON_LINE_HEIGHT;
     horizon.bump1_x = HORIZON_LINE_BUMP1_X;
     horizon.bump1_width = HORIZON_LINE_BUMP1_WIDTH;
-    horizon.bump1_delta = HORIZON_LINE_BUMP1_X;
     horizon.bump2_x = HORIZON_LINE_BUMP2_X;
     horizon.bump2_width = HORIZON_LINE_BUMP2_WIDTH;
-    horizon.bump2_delta = HORIZON_LINE_BUMP2_X;
 }
 
 void GAME_UpdateHorizon()
@@ -231,26 +230,23 @@ void GAME_UpdateHorizon()
     }
 
     // move bumps
-    if (horizon.bump1_delta - game_speed > 0)
+    if (horizon.bump1_x - game_speed > 0)
     {
-        horizon.bump1_delta -= game_speed;
+        horizon.bump1_x -= game_speed;
     }
     else
     {
-        horizon.bump1_delta = horizon.width;
+        horizon.bump1_x = horizon.width;
     }
-    horizon.bump1_x = floor(horizon.bump1_delta);
 
-
-    if (horizon.bump2_delta - game_speed > 0)
+    if (horizon.bump2_x - game_speed > 0)
     {
-        horizon.bump2_delta -= game_speed;
+        horizon.bump2_x -= game_speed;
     }
     else
     {
-        horizon.bump2_delta = horizon.width;
+        horizon.bump2_x = horizon.width;
     }
-    horizon.bump2_x = floor(horizon.bump2_delta);
 }
 
 void GAME_InitPrerodactyl(game_object_t *pterodactyl)
@@ -271,7 +267,6 @@ void GAME_CreatePterodactyl(game_object_t *pterodactyl)
     pterodactyl->width = PTERODACTYL_WIDTH;
     pterodactyl->height = PTERODACTYL_HEIGHT;
     pterodactyl->sprite = pterodactyl1;
-    pterodactyl->delta = pterodactyl->x;
     pterodactyl->visible = TRUE;
 }
 
@@ -297,15 +292,13 @@ void GAME_UpdatePterodactyl(game_object_t *pterodactyl)
     FB_DrawGameObject(*pterodactyl);
 
     // move to the left in small steps
-    if (pterodactyl->delta + pterodactyl->width > 0)
+    if (pterodactyl->x + pterodactyl->width > 0)
     {
-        pterodactyl->delta -= game_speed;
+        pterodactyl->x -= game_speed;
     } else
     {
         pterodactyl->visible = FALSE;
     }
-    pterodactyl->x = floor(pterodactyl->delta);
-
 }
 
 void GAME_InitCactus(game_object_t *cactus)
@@ -319,7 +312,6 @@ void GAME_CreateCactus(game_object_t *cactus)
 
     cactus->x = WIDTH;
     cactus->y = HEIGHT - CACTUS_PADDING_BOTTOM;
-    cactus->delta = WIDTH;
     cactus->visible = TRUE;
 
     switch(cactus_type){
@@ -357,14 +349,13 @@ void GAME_UpdateCactus(game_object_t *cactus)
     FB_DrawGameObject(*cactus);
 
     // move to the left in small steps
-    if (cactus->delta + cactus->width > 0)
+    if (cactus->x + cactus->width > 0)
     {
-        cactus->delta -= game_speed;
+        cactus->x -= game_speed;
     } else
     {
         cactus->visible = FALSE;
     }
-    cactus->x = floor(cactus->delta);
 }
 
 uint8_t GAME_CountVisibleCactuses(game_object_t cactus[])
@@ -385,7 +376,6 @@ void GAME_InitTrex()
     trex.width = TREX_STANDING_WIDTH;
     trex.height = TREX_STANDING_HEIGHT;
     trex.sprite = trex_running1;
-    trex.delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
     trex.visible = TRUE;
 }
 
@@ -434,7 +424,6 @@ void GAME_UpdateDuckingTrex()
 void GAME_UpdateJumpingTrex()
 {
     static uint8_t jump_max_y_reached = 0;
-    static float trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
 
     trex.width = TREX_STANDING_WIDTH;
     trex.height = TREX_STANDING_HEIGHT;
@@ -444,8 +433,7 @@ void GAME_UpdateJumpingTrex()
     if (!jump_max_y_reached
             && trex.y >= (HEIGHT - TREX_MAX_JUMP_HEIGHT))
     {
-        trex_y_delta -= JUMPING_SPEED;
-        trex.y = floor(trex_y_delta);
+        trex.y -= JUMPING_SPEED;
     } else
         jump_max_y_reached = 1;
 
@@ -453,15 +441,14 @@ void GAME_UpdateJumpingTrex()
     if (jump_max_y_reached
             && trex.y <= (HEIGHT - TREX_STANDING_HEIGHT - 2))
     {
-        trex_y_delta += GAME_GRAVITY;
-        trex.y = floor(trex_y_delta);
+        trex.y += GAME_GRAVITY;
     }
 
     //next state running
     if (jump_max_y_reached
             && trex.y > (HEIGHT - TREX_STANDING_HEIGHT - 2))
     {
-        trex_y_delta = HEIGHT - TREX_STANDING_HEIGHT - 1;
+        trex.y = HEIGHT - TREX_STANDING_HEIGHT - 1;
         if (button_state & (1 << RIGHT_BUTTON_BIT))
         {
             trex_state = DUCKING;

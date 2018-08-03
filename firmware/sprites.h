@@ -74,6 +74,9 @@ static const __flash uint8_t pterodactyl2[] =
     0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+#define CACTUS_PADDING_BOTTOM       2
+#define CACTUS_NUMBER_OF_SPECIES    4
+
 #define CACTUS1_WIDTH   5
 #define CACTUS1_HEIGHT  8
 static const __flash uint8_t cactus1[] =

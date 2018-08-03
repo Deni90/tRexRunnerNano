@@ -23,8 +23,6 @@
 #define TREX_MAX_JUMP_HEIGHT            (HEIGHT - 2)
 
 #define CACTUS_MAX_COUNT                2
-#define CACTUS_NUMBER_OF_SPECIES        4
-#define CACTUS_PADDING_BOTTOM           2
 #define CACTUS_RESPAWN_BASE_DELAY       15  // frames
 #define CACTUS_RESPAWN_MAX_DELAY        100 // frames
 #define CACTUS_RESPAWN_MAX_LIMIT        10  // frames
@@ -52,12 +50,11 @@ typedef enum trex_states_e {
 } trex_states_t;
 
 typedef struct game_object_s {
-    int16_t x;
-    int16_t y;
+    float x;
+    float y;
     uint8_t width;
     uint8_t height;
     const uint8_t *sprite;
-    float delta;
     uint8_t visible;
 } game_object_t;
 
@@ -66,12 +63,10 @@ typedef struct horizon_s {
     int16_t y;
     uint8_t width;
     uint8_t height;
-    uint8_t bump1_x;
+    float bump1_x;
     uint8_t bump1_width;
-    float bump1_delta;
-    uint8_t bump2_x;
+    float bump2_x;
     uint8_t bump2_width;
-    float bump2_delta;
 } horizon_t;
 
 void FB_Clear();
