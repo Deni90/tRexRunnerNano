@@ -15,20 +15,19 @@
 
 #define RENDER_PERIOD                   20 // 50 FPS
 
+#define TREX_RUNNING_SPEED              4
+#define TREX_MAX_JUMP_HEIGHT            (HEIGHT - 2)
+
+#define CACTUS_MAX_COUNT                3
+
+#define PTERODACTYL                     CACTUS_MAX_COUNT
 #define PTERODACTYL_WING_SWAP           20
 #define PTERODACTYL_MIN_FLY_HEIGHT      (HEIGHT - PTERODACTYL_HEIGHT)
 #define PTERODACTYL_MAX_FLY_HEIGHT      (HEIGHT - TREX_STANDING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 
-#define TREX_RUNNING_SPEED              4
-#define TREX_MAX_JUMP_HEIGHT            (HEIGHT - 2)
-
-#define CACTUS_MAX_COUNT                2
-#define CACTUS_RESPAWN_BASE_DELAY       15  // frames
-#define CACTUS_RESPAWN_MAX_DELAY        100 // frames
-#define CACTUS_RESPAWN_MAX_LIMIT        10  // frames
-#define CACTUS_RESPAWN_DELAY_DECREMENT  5  // frames
-
-#define SHOW_PTERODACTYL                90
+#define OBSTACLE_RESPAWN_BASE_DISTANCE  50  // px
+#define OBSTACLE_RESPAWN_DISTANCE_INC   5   // px
+#define SHOW_PTERODACTYL                120 // px
 
 #define GAME_GRAVITY                    2.6f
 #define GAME_INITIAL_SPEED              3.8f

@@ -45,11 +45,11 @@ static game_object_t trex;
 static game_object_t obstacles[CACTUS_MAX_COUNT + 1]; // last element is pterodactyl
 
 static uint8_t latest_cactus = 0; // index of the newest cactus in the array
-static uint16_t cactus_respawn_max_delay = CACTUS_RESPAWN_MAX_DELAY;
-static uint16_t cactus_respawn_delay = 0;
 
-static uint16_t pterodactyl_respawn_delay = 65535;
-static uint8_t respawn_pterodactyl = FALSE;
+static uint16_t obstacle_respawn_base_distance = OBSTACLE_RESPAWN_BASE_DISTANCE;
+// make sure WIDTH > OBSTACLE_RESPAWN_BASE_DISTANCE
+static uint16_t obstacle_respawn_max_distance = WIDTH - OBSTACLE_RESPAWN_BASE_DISTANCE;
+static uint16_t show_pterodactyl = SHOW_PTERODACTYL;
 
 /*
  * Timer1 "Compare Match" ISR
@@ -513,10 +513,9 @@ void GAME_Init()
     game_speed = GAME_INITIAL_SPEED;
     trex_state = RUNNING;
     latest_cactus = 0; // index of the newest cactus in the array
-    cactus_respawn_max_delay = CACTUS_RESPAWN_MAX_DELAY;
-    cactus_respawn_delay = 0;
-    pterodactyl_respawn_delay = 65535;
-    respawn_pterodactyl = FALSE;
+    obstacle_respawn_base_distance = OBSTACLE_RESPAWN_BASE_DISTANCE;
+    obstacle_respawn_max_distance = WIDTH - OBSTACLE_RESPAWN_BASE_DISTANCE;
+    show_pterodactyl = SHOW_PTERODACTYL;
 
     srand(seed);    // initialize PRNG
 
@@ -524,7 +523,7 @@ void GAME_Init()
     GAME_InitTrex();
     for(uint8_t i = 0; i < CACTUS_MAX_COUNT; i++)
         GAME_InitCactus(&obstacles[i]);
-    GAME_InitPrerodactyl(&obstacles[CACTUS_MAX_COUNT]);
+    GAME_InitPrerodactyl(&obstacles[PTERODACTYL]);
 
     FB_Clear();
     GAME_UpdateHorizon();
@@ -613,20 +612,38 @@ int main(void)
             GAME_UpdateHorizon();
 
             // create new obstacles
-            if(GAME_CountVisibleCactuses(obstacles) <= CACTUS_MAX_COUNT)
+            if(GAME_CountVisibleCactuses(obstacles) < CACTUS_MAX_COUNT)
             {
-                // time for creating new cactus?
-                if(obstacles[latest_cactus].visible == FALSE && cactus_respawn_delay == 0)
+                uint8_t previous_cactus;
+                if(latest_cactus > 0)
                 {
-                    GAME_CreateCactus(&obstacles[latest_cactus]);
-                    // update delar for creating new one
-                    cactus_respawn_delay = CACTUS_RESPAWN_BASE_DELAY + rand() % cactus_respawn_max_delay;
-                    latest_cactus++;
-                    // respawn pterodactyl?
-                    if(cactus_respawn_delay >= SHOW_PTERODACTYL && !obstacles[CACTUS_MAX_COUNT].visible)
+                    previous_cactus = latest_cactus - 1;
+                } else
+                {
+                    previous_cactus = CACTUS_MAX_COUNT - 1;
+                }
+                if(obstacles[latest_cactus].visible == FALSE &&
+                        !obstacles[PTERODACTYL].visible)
+                {
+                    if((int)obstacles[previous_cactus].x <= (WIDTH - 
+                            obstacles[previous_cactus].width) ||
+                            !obstacles[previous_cactus].visible)
                     {
-                        pterodactyl_respawn_delay = cactus_respawn_delay / 2;
-                        respawn_pterodactyl = TRUE;
+                        GAME_CreateCactus(&obstacles[latest_cactus]);
+                        uint16_t random_distance =
+                                obstacle_respawn_base_distance +
+                                rand() % obstacle_respawn_max_distance;
+                        high_score = random_distance;
+                        obstacles[latest_cactus].x += random_distance;
+                        // respawn pterodatyl?
+                        if(random_distance >= show_pterodactyl)
+                        {
+                            // replace cactus with pterodactyl
+                            obstacles[latest_cactus].visible = FALSE;
+                            GAME_CreatePterodactyl(&obstacles[CACTUS_MAX_COUNT]);
+                            obstacles[PTERODACTYL].x += random_distance;
+                        }
+                        latest_cactus++;
                     }
                 }
                 if(latest_cactus == CACTUS_MAX_COUNT)
@@ -635,29 +652,13 @@ int main(void)
                 }
             }
 
-            if(pterodactyl_respawn_delay == 0 && respawn_pterodactyl)
-            {
-                respawn_pterodactyl = FALSE;
-                GAME_CreatePterodactyl(&obstacles[CACTUS_MAX_COUNT]);
-            }
-
-            if(cactus_respawn_delay)
-            {
-                cactus_respawn_delay--;
-            }
-
-            if(pterodactyl_respawn_delay)
-            {
-                pterodactyl_respawn_delay--;
-            }
-
             // update cactuses
             for(uint8_t i = 0; i < CACTUS_MAX_COUNT; i++)
             {
                 GAME_UpdateCactus(&obstacles[i]);
             }
             // update pterodactyl
-            GAME_UpdatePterodactyl(&obstacles[CACTUS_MAX_COUNT]);
+            GAME_UpdatePterodactyl(&obstacles[PTERODACTYL]);
 
             // update trex
             GAME_UpdateTrex();
@@ -674,10 +675,10 @@ int main(void)
             if((score % 100) == 0)
             {
                 game_speed += GAME_SPEED_DELTA;
-                if(cactus_respawn_max_delay >= CACTUS_RESPAWN_MAX_LIMIT)
-                {
-                    cactus_respawn_max_delay -= CACTUS_RESPAWN_DELAY_DECREMENT;
-                }
+                // increase the distance between obstacles a little bit
+                obstacle_respawn_base_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
+                obstacle_respawn_max_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
+                show_pterodactyl += OBSTACLE_RESPAWN_DISTANCE_INC * 2;
             }
         }
     }
