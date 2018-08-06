@@ -544,7 +544,6 @@ void GAME_Init()
 
 // TODO battery monitor
 // TODO inactivity monitor
-// TODO game over string
 int main(void)
 {
     BUTTONS_init();
@@ -583,6 +582,10 @@ int main(void)
                 button_released = FALSE;
                 GAME_Init();
             }
+            FB_DrawImage(WIDTH /2 - GAME_OVER_SPLASH_WIDTH / 2,
+                    10, game_over_splash, GAME_OVER_SPLASH_WIDTH,
+                    GAME_OVER_SPLASH_HEIGHT);
+            SSD1306_display(frame_buffer);
             continue;
         }
 
