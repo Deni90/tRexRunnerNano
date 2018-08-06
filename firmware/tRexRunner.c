@@ -644,7 +644,6 @@ int main(void)
                         uint16_t random_distance =
                                 obstacle_respawn_base_distance +
                                 rand() % obstacle_respawn_max_distance;
-                        high_score = random_distance;
                         obstacles[latest_cactus].x += random_distance;
                         // respawn pterodatyl?
                         if(random_distance >= show_pterodactyl)
