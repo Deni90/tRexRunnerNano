@@ -11,7 +11,6 @@
 #include <stdlib.h>
 
 #include "tRexRunner.h"
-#include "sprites.h"
 
 #define CONCAT(a, b)            a ## b
 #define CONCAT_EXP(a, b)        CONCAT(a, b)
@@ -51,6 +50,12 @@ static uint16_t obstacle_respawn_base_distance = OBSTACLE_RESPAWN_BASE_DISTANCE;
 static uint16_t obstacle_respawn_max_distance = WIDTH - OBSTACLE_RESPAWN_BASE_DISTANCE;
 static uint16_t show_pterodactyl = SHOW_PTERODACTYL;
 
+// lookup table for pterodactyl flying heights
+static const __flash uint8_t pterodactyl_flying_heights[] = {
+        PTERODACTYL_MIN_FLY_HEIGHT,
+        PTERODACTYL_MID_FLY_HEIGHT,
+        PTERODACTYL_MAX_FLY_HEIGHT
+};
 /*
  * Timer1 "Compare Match" ISR
  */
@@ -218,10 +223,13 @@ void GAME_UpdateHorizon()
                 (i < trex.x + TREX_DUCKING_CLEARENCE_MAX))
             continue;
 
-        if(i >= horizon.bump1_x && i < horizon.bump1_x + horizon.bump1_width)
+        int8_t bump1_xx = floor(horizon.bump1_x);
+        int8_t bump2_xx = floor(horizon.bump2_x);
+
+        if(i >= bump1_xx && i < bump1_xx + horizon.bump1_width)
             // draw first bump
             FB_SetPixel(i, horizon.y);
-        else if(i >= horizon.bump2_x && i < horizon.bump2_x + horizon.bump2_width)
+        else if(i >= bump2_xx && i < bump2_xx + horizon.bump2_width)
              // draw second bump
             FB_SetPixel(i, horizon.y);
         else
@@ -261,9 +269,9 @@ void GAME_InitPrerodactyl(game_object_t *pterodactyl)
 
 void GAME_CreatePterodactyl(game_object_t *pterodactyl)
 {
-    uint8_t range = PTERODACTYL_MIN_FLY_HEIGHT - PTERODACTYL_MAX_FLY_HEIGHT;
     pterodactyl->x = WIDTH;
-    pterodactyl->y = PTERODACTYL_MAX_FLY_HEIGHT + (rand() % range);
+    uint8_t temp = rand() % PTERODACTYL_FLYING_HEIGHTS_CNT;
+    pterodactyl->y = pterodactyl_flying_heights[temp];
     pterodactyl->width = PTERODACTYL_WIDTH;
     pterodactyl->height = PTERODACTYL_HEIGHT;
     pterodactyl->sprite = pterodactyl1;

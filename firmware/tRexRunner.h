@@ -9,6 +9,7 @@
 #define TREXRUNNER_H_
 
 #include "ssd1306/ssd1306.h"
+#include "sprites.h"
 
 #define WIDTH                           SSD1306_LCDWIDTH
 #define HEIGHT                          SSD1306_LCDHEIGHT
@@ -21,8 +22,10 @@
 #define CACTUS_MAX_COUNT                3
 
 #define PTERODACTYL                     CACTUS_MAX_COUNT
-#define PTERODACTYL_WING_SWAP           20
+#define PTERODACTYL_WING_SWAP           10
+#define PTERODACTYL_FLYING_HEIGHTS_CNT  3
 #define PTERODACTYL_MIN_FLY_HEIGHT      (HEIGHT - PTERODACTYL_HEIGHT)
+#define PTERODACTYL_MID_FLY_HEIGHT      (HEIGHT - TREX_DUCKING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 #define PTERODACTYL_MAX_FLY_HEIGHT      (HEIGHT - TREX_STANDING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 
 #define OBSTACLE_RESPAWN_BASE_DISTANCE  50  // px
