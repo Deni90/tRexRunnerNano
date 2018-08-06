@@ -16,7 +16,7 @@
 
 #define RENDER_PERIOD                   20 // 50 FPS
 
-#define TREX_RUNNING_SPEED              4
+#define TREX_RUNNING_SPEED              2
 #define TREX_MAX_JUMP_HEIGHT            (HEIGHT - 2)
 
 #define CACTUS_MAX_COUNT                3
@@ -29,7 +29,7 @@
 #define PTERODACTYL_MAX_FLY_HEIGHT      (HEIGHT - TREX_STANDING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 
 #define OBSTACLE_RESPAWN_BASE_DISTANCE  50  // px
-#define OBSTACLE_RESPAWN_DISTANCE_INC   5   // px
+#define OBSTACLE_RESPAWN_DISTANCE_INC   4   // px
 #define SHOW_PTERODACTYL                120 // px
 
 #define GAME_GRAVITY                    2.6f
