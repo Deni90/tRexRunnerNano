@@ -17,7 +17,7 @@
 #define RENDER_PERIOD                   20 // 50 FPS
 
 #define TREX_RUNNING_SPEED              2
-#define TREX_MAX_JUMP_HEIGHT            (HEIGHT - 2)
+#define TREX_MAX_JUMP_HEIGHT            (HEIGHT - HORIZON_LINE_HEIGHT - 1)
 
 #define CACTUS_MAX_COUNT                3
 
@@ -39,6 +39,8 @@
 #define GAME_SCORE_INCREMENT            50 // mS
 
 #define INVERTED_MODE_THRESHOLD         1000
+
+#define HI_SCORE_Y                      1
 
 #define DEBOUNCE_INTERVAL               50
 

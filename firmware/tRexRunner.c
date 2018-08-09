@@ -519,9 +519,9 @@ void GAME_UpdateTrex()
 
 void GAME_ShowScore()
 {
-    FB_DrawImage(WIDTH - DIGIT_WIDTH * 13, 0, hi_score_str, HI_SCORE_STR_WIDTH, HI_SCORE_STR_HEIGHT);
-    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 11, 0, high_score);
-    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 5 - 1, 0, score);
+    FB_DrawImage(WIDTH - DIGIT_WIDTH * 13, HI_SCORE_Y, hi_score_str, HI_SCORE_STR_WIDTH, HI_SCORE_STR_HEIGHT);
+    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 11, HI_SCORE_Y, high_score);
+    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 5 - 1, HI_SCORE_Y, score);
 }
 
 void GAME_Init()
