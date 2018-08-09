@@ -50,6 +50,8 @@ static uint16_t obstacle_respawn_base_distance = OBSTACLE_RESPAWN_BASE_DISTANCE;
 static uint16_t obstacle_respawn_max_distance = WIDTH - OBSTACLE_RESPAWN_BASE_DISTANCE;
 static uint16_t show_pterodactyl = SHOW_PTERODACTYL;
 
+static uint8_t inverted_mode = FALSE;
+
 // lookup table for pterodactyl flying heights
 static const __flash uint8_t pterodactyl_flying_heights[] = {
         PTERODACTYL_MIN_FLY_HEIGHT,
@@ -186,6 +188,14 @@ void FB_ClearPixel(uint8_t x, uint8_t y)
     uint16_t buffer_index = WIDTH * (y / 8) + x;
     frame_buffer[buffer_index] &= ~(1 << (y % 8));
 
+}
+
+void FB_InvertColor()
+{
+    for(uint16_t i = 0; i < (WIDTH * HEIGHT / 8); i++)
+    {
+        frame_buffer[i] = ~frame_buffer[i];
+    }
 }
 
 void GAME_InitHorizon()
@@ -524,6 +534,7 @@ void GAME_Init()
     obstacle_respawn_base_distance = OBSTACLE_RESPAWN_BASE_DISTANCE;
     obstacle_respawn_max_distance = WIDTH - OBSTACLE_RESPAWN_BASE_DISTANCE;
     show_pterodactyl = SHOW_PTERODACTYL;
+    inverted_mode = FALSE;
 
     srand(seed);    // initialize PRNG
 
@@ -581,12 +592,16 @@ int main(void)
             {
                 button_released = FALSE;
                 GAME_Init();
+            } else
+            {
+                if(inverted_mode) FB_InvertColor(); // restore to original buffer
+                FB_DrawImage(WIDTH /2 - GAME_OVER_SPLASH_WIDTH / 2,
+                        10, game_over_splash, GAME_OVER_SPLASH_WIDTH,
+                        GAME_OVER_SPLASH_HEIGHT);
+                if(inverted_mode) FB_InvertColor(); // invert back
+                SSD1306_display(frame_buffer);
+                continue;
             }
-            FB_DrawImage(WIDTH /2 - GAME_OVER_SPLASH_WIDTH / 2,
-                    10, game_over_splash, GAME_OVER_SPLASH_WIDTH,
-                    GAME_OVER_SPLASH_HEIGHT);
-            SSD1306_display(frame_buffer);
-            continue;
         }
 
         if (global_clock >= RENDER_PERIOD)
@@ -672,7 +687,7 @@ int main(void)
 
             // update trex
             GAME_UpdateTrex();
-
+            if(inverted_mode) FB_InvertColor();
             /* RENDER */
             SSD1306_display(frame_buffer);
         }
@@ -689,6 +704,10 @@ int main(void)
                 obstacle_respawn_base_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
                 obstacle_respawn_max_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
                 show_pterodactyl += OBSTACLE_RESPAWN_DISTANCE_INC * 2;
+            }
+            if((score % INVERTED_MODE_THRESHOLD) == 0)
+            {
+                inverted_mode = (inverted_mode == TRUE)? FALSE : TRUE;
             }
         }
     }

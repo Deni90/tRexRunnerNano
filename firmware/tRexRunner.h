@@ -38,6 +38,8 @@
 #define JUMPING_SPEED                   2.9f
 #define GAME_SCORE_INCREMENT            50 // mS
 
+#define INVERTED_MODE_THRESHOLD         1000
+
 #define DEBOUNCE_INTERVAL               50
 
 #define BUTTON_IOPORTNAME               D
@@ -77,6 +79,7 @@ void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value);
 uint8_t FB_DrawGameObject(game_object_t game_object);
 void FB_SetPixel(uint8_t x, uint8_t y);
 void FB_ClearPixel(uint8_t x, uint8_t y);
+void FB_InvertColor();
 
 void GAME_Init();
 void GAME_ShowScore();
