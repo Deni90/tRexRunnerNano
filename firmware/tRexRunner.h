@@ -22,20 +22,20 @@
 #define CACTUS_MAX_COUNT                3
 
 #define PTERODACTYL                     CACTUS_MAX_COUNT
-#define PTERODACTYL_WING_SWAP           10
+#define PTERODACTYL_WING_SWAP           8
 #define PTERODACTYL_FLYING_HEIGHTS_CNT  3
 #define PTERODACTYL_MIN_FLY_HEIGHT      (HEIGHT - PTERODACTYL_HEIGHT)
 #define PTERODACTYL_MID_FLY_HEIGHT      (HEIGHT - TREX_DUCKING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 #define PTERODACTYL_MAX_FLY_HEIGHT      (HEIGHT - TREX_STANDING_HEIGHT - 3 - PTERODACTYL_HEIGHT)
 
 #define OBSTACLE_RESPAWN_BASE_DISTANCE  50  // px
-#define OBSTACLE_RESPAWN_DISTANCE_INC   4   // px
+#define OBSTACLE_RESPAWN_DISTANCE_INC   5   // px
 #define SHOW_PTERODACTYL                120 // px
 
-#define GAME_GRAVITY                    2.6f
+#define GAME_GRAVITY                    3.2f
 #define GAME_INITIAL_SPEED              3.8f
 #define GAME_SPEED_DELTA                0.4f
-#define JUMPING_SPEED                   2.9f
+#define JUMPING_SPEED                   3.5f
 #define GAME_SCORE_INCREMENT            50 // mS
 
 #define INVERTED_MODE_THRESHOLD         1000
