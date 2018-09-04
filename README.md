@@ -8,6 +8,9 @@ This project tries to be the smallest implementation of Google's easter egg T-Re
 
 The goal is to make a small game console by using Atmels Atmega88 microcontroller and SSSD1306 oled display.
 
+## Schematic  & PCB ##
+Made with AUTODESK EAGLE 9.0.0
+
 ## Building ##
 ```
 cd firmware
