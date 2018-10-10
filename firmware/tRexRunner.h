@@ -44,9 +44,18 @@
 
 #define DEBOUNCE_INTERVAL               50
 
-#define BUTTON_IOPORTNAME               D
-#define LEFT_BUTTON_BIT                 0
-#define RIGHT_BUTTON_BIT                1
+#define BUTTON_IOPORTNAME               B
+#define LEFT_BUTTON_BIT                 1
+#define RIGHT_BUTTON_BIT                0
+
+#define USB_PWR_IOPORTNAME              D
+#define USB_PWR_BIT                     4
+
+#define CHG_PIN_IOPORTNAME              D
+#define CHG_PIN_BIT                     5
+
+#define AUTO_CUTOFF_IOPORTNAME          D
+#define AUTO_CUTOFF_BIT                 6
 
 #define TRUE                            1
 #define FALSE                           0

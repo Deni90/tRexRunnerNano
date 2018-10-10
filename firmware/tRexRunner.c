@@ -19,6 +19,18 @@
 #define BUTTON_INPORT           CONCAT_EXP(PIN, BUTTON_IOPORTNAME)
 #define BUTTON_DDRPORT          CONCAT_EXP(DDR, BUTTON_IOPORTNAME)
 
+#define USB_PWR_OUTPORT          CONCAT_EXP(PORT, USB_PWR_IOPORTNAME)
+#define USB_PWR_INPORT           CONCAT_EXP(PIN, USB_PWR_IOPORTNAME)
+#define USB_PWR_DDRPORT          CONCAT_EXP(DDR, USB_PWR_IOPORTNAME)
+
+#define CHG_PIN_OUTPORT          CONCAT_EXP(PORT, CHG_PIN_IOPORTNAME)
+#define CHG_PIN_INPORT           CONCAT_EXP(PIN, CHG_PIN_IOPORTNAME)
+#define CHG_PIN_DDRPORT          CONCAT_EXP(DDR, CHG_PIN_IOPORTNAME)
+
+#define AUTO_CUTOFF_OUTPORT          CONCAT_EXP(PORT, AUTO_CUTOFF_IOPORTNAME)
+#define AUTO_CUTOFF_INPORT           CONCAT_EXP(PIN, AUTO_CUTOFF_IOPORTNAME)
+#define AUTO_CUTOFF_DDRPORT          CONCAT_EXP(DDR, AUTO_CUTOFF_IOPORTNAME)
+
 #define left_button_state()     (!(BUTTON_INPORT & (1 << LEFT_BUTTON_BIT)))
 #define right_button_state()    (!(BUTTON_INPORT & (1 << RIGHT_BUTTON_BIT)))
 
@@ -125,6 +137,30 @@ void BUTTONS_monitorButtons()
         rb_debounce_clock = 0;
     }
     sei();
+}
+
+void POWER_MANAGER_init()
+{
+    AUTO_CUTOFF_OUTPORT &= ~(1 << AUTO_CUTOFF_BIT); // pull down AUTO_CUTOFF_BIT
+    AUTO_CUTOFF_DDRPORT |= (1 << AUTO_CUTOFF_BIT); // configure AUTO_CUTOFF_BIT as output
+
+    CHG_PIN_OUTPORT &= ~(1 << CHG_PIN_BIT); // pull down CHG_PIN_BIT
+    CHG_PIN_DDRPORT &= ~(1 << CHG_PIN_BIT); // configure CHG_PIN_BIT as input
+
+    USB_PWR_OUTPORT &= ~(1 << USB_PWR_BIT); // pull down USB_PWR_BIT
+    USB_PWR_DDRPORT &= ~(1 << USB_PWR_BIT); // configure USB_PWR_BIT as input
+
+    //TODO init adc
+}
+
+void POWER_MANAGER_turnOn()
+{
+    AUTO_CUTOFF_OUTPORT |= (1 << AUTO_CUTOFF_BIT);
+}
+
+void POWER_MANAGER_turnOff()
+{
+    AUTO_CUTOFF_OUTPORT &= ~(1 << AUTO_CUTOFF_BIT);
 }
 
 void FB_Clear()
@@ -558,10 +594,15 @@ void GAME_Init()
 int main(void)
 {
     BUTTONS_init();
+
+    POWER_MANAGER_init();
+
+    POWER_MANAGER_turnOn();
+
     TIMER_init();
     sei();
 
-    TIMER_delay(1700);
+    TIMER_delay(1000);
 
     SSD1306_init();
     SSD1306_clear();
