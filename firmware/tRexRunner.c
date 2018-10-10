@@ -7,6 +7,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/eeprom.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -63,6 +64,8 @@ static uint16_t obstacle_respawn_max_distance = WIDTH - OBSTACLE_RESPAWN_BASE_DI
 static uint16_t show_pterodactyl = SHOW_PTERODACTYL;
 
 static uint8_t inverted_mode = FALSE;
+
+static uint32_t EEMEM high_score_backup = 0;
 
 // lookup table for pterodactyl flying heights
 static const __flash uint8_t pterodactyl_flying_heights[] = {
@@ -562,7 +565,7 @@ void GAME_ShowScore()
 
 void GAME_Init()
 {
-    high_score = 0; //TODO read from eeprom
+    eeprom_read_block(&high_score, &high_score_backup, sizeof(high_score_backup));
     score = 0;
     game_speed = GAME_INITIAL_SPEED;
     trex_state = RUNNING;
@@ -641,6 +644,11 @@ int main(void)
                         GAME_OVER_SPLASH_HEIGHT);
                 if(inverted_mode) FB_InvertColor(); // invert back
                 SSD1306_display(frame_buffer);
+                if(score > high_score)
+                {
+                    high_score = score;
+                    eeprom_write_block(&high_score, &high_score_backup, sizeof(high_score_backup));
+                }
                 continue;
             }
         }

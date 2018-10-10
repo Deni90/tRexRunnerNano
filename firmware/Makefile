@@ -15,15 +15,19 @@ COMPILE = avr-gcc -Wall -Os -std=gnu99 -DF_CPU=$(F_CPU) $(CFLAGS) -mmcu=$(DEVICE
 # symbolic targets:
 help:
 	@echo "This Makefile has no default rule. Use one of the following:"
-	@echo "make hex ....... to build main.hex"
-	@echo "make program ... to flash fuses and firmware"
-	@echo "make fuse ...... to flash the fuses"
-	@echo "make flash ..... to flash the firmware (use this on metaboard)"
+	@echo "make hex ........... to build main.hex"
+	@echo "make eeprom......... to build main.eep"
+	@echo "make program ....... to flash fuses irmware and eeprom"
+	@echo "make fuse .......... to flash the fuses"
+	@echo "make flash ......... to flash the firmware (use this on metaboard)"
+	@echo "make flash_eeprom .. to flash the eeprom image"
 	@echo "make clean ..... to delete objects and hex file"
 
 hex: main.hex
 
-program: flash fuse
+eeprom: main.eep
+
+program: flash fuse eeprom
 
 # rule for programming fuse bits:
 fuse:
@@ -35,9 +39,13 @@ fuse:
 flash: main.hex
 	$(AVRDUDE) -U flash:w:main.hex:i
 
+# rule for uploading eeprom:
+flash_eeprom: main.eep
+	$(AVRDUDE) -U eeprom:w:main.eep:i
+
 # rule for deleting dependent files (those which can be built by Make):
 clean:
-	rm -f main.hex main.lst main.obj main.cof main.list main.map main.eep.hex main.elf *.o twi/*.o ssd1306/*.o
+	rm -f main.hex main.eep main.lst main.obj main.cof main.list main.map main.eep.hex main.elf *.o twi/*.o ssd1306/*.o
 
 # Generic rule for compiling C files:
 .c.o:
@@ -53,3 +61,6 @@ main.hex: main.elf
 	rm -f main.hex main.eep.hex
 	avr-objcopy -j .text -j .data -O ihex main.elf main.hex
 	avr-size main.hex
+
+main.eep: main.elf
+	avr-objcopy -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O ihex "main.elf" "main.eep"
