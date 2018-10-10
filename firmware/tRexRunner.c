@@ -592,6 +592,44 @@ void GAME_Init()
     SSD1306_display(frame_buffer);
 }
 
+void GAME_HandleState()
+{
+    // update trex state based on button states
+    if (button_state & (1 << LEFT_BUTTON_BIT))
+    {
+        trex_state = JUMPING;
+    }
+    if ((button_state & (1 << RIGHT_BUTTON_BIT)) && (trex_state != JUMPING))
+    {
+        if(trex_state == RUNNING)
+        {
+            // preload a ducking sprite
+            trex.sprite = trex_ducking1;
+        }
+        trex_state = DUCKING;
+    } else if (trex_state != JUMPING)
+    {
+        if(trex_state == DUCKING)
+        {
+            // preload a running sprite
+            trex.sprite = trex_running1;
+        }
+        trex_state = RUNNING;
+    }
+}
+
+void GAME_AdjustDifficulty()
+{
+    if((score % 100) == 0)
+    {
+        game_speed += GAME_SPEED_DELTA;
+        // increase the distance between obstacles a little bit
+        obstacle_respawn_base_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
+        obstacle_respawn_max_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
+        show_pterodactyl += OBSTACLE_RESPAWN_DISTANCE_INC * 2;
+    }
+}
+
 // TODO battery monitor
 // TODO inactivity monitor
 int main(void)
@@ -653,32 +691,11 @@ int main(void)
             }
         }
 
+        GAME_HandleState();
+
         if (global_clock >= RENDER_PERIOD)
         {
             global_clock = 0;
-
-            // update trex state based on button states
-            if (button_state & (1 << LEFT_BUTTON_BIT))
-            {
-                trex_state = JUMPING;
-            }
-            if ((button_state & (1 << RIGHT_BUTTON_BIT)) && (trex_state != JUMPING))
-            {
-                if(trex_state == RUNNING)
-                {
-                    // preload a ducking sprite
-                    trex.sprite = trex_ducking1;
-                }
-                trex_state = DUCKING;
-            } else if (trex_state != JUMPING)
-            {
-                if(trex_state == DUCKING)
-                {
-                    // preload a running sprite
-                    trex.sprite = trex_running1;
-                }
-                trex_state = RUNNING;
-            }
 
             FB_Clear();
 
@@ -746,14 +763,8 @@ int main(void)
         {
             game_speed_update_clock = 0;
             score++;
-            if((score % 100) == 0)
-            {
-                game_speed += GAME_SPEED_DELTA;
-                // increase the distance between obstacles a little bit
-                obstacle_respawn_base_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
-                obstacle_respawn_max_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
-                show_pterodactyl += OBSTACLE_RESPAWN_DISTANCE_INC * 2;
-            }
+            GAME_AdjustDifficulty();
+
             if((score % INVERTED_MODE_THRESHOLD) == 0)
             {
                 inverted_mode = (inverted_mode == TRUE)? FALSE : TRUE;
