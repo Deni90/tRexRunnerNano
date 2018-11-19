@@ -563,10 +563,25 @@ void GAME_ShowScore()
     FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 5 - 1, HI_SCORE_Y, score);
 }
 
+void GAME_BackupHighScore()
+{
+    cli();
+    eeprom_write_block(&high_score, &high_score_backup, sizeof(high_score_backup));
+    sei();
+}
+
+void GAME_RestoreHighScore()
+{
+    cli();
+    eeprom_read_block(&high_score, &high_score_backup, sizeof(high_score_backup));
+    sei();
+}
+
 void GAME_Init()
 {
-    eeprom_read_block(&high_score, &high_score_backup, sizeof(high_score_backup));
+
     score = 0;
+    GAME_RestoreHighScore();
     game_speed = GAME_INITIAL_SPEED;
     trex_state = RUNNING;
     latest_cactus = 0; // index of the newest cactus in the array
@@ -685,7 +700,7 @@ int main(void)
                 if(score > high_score)
                 {
                     high_score = score;
-                    eeprom_write_block(&high_score, &high_score_backup, sizeof(high_score_backup));
+                    GAME_BackupHighScore();
                 }
                 continue;
             }

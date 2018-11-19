@@ -94,6 +94,8 @@ void FB_InvertColor();
 
 void GAME_Init();
 void GAME_ShowScore();
+void GAME_BackupHighScore();
+void GAME_RestoreHighScore();
 void GAME_HandleState();
 void GAME_AdjustDifficulty();
 
