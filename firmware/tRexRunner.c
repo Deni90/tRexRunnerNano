@@ -42,6 +42,7 @@ volatile uint8_t lb_debounce_clock = 0;
 volatile uint8_t rb_debounce_clock = 0;
 volatile uint16_t game_speed_update_clock = 0;
 volatile uint16_t delay_clock = 0;
+volatile uint16_t inactivity_clock = 0;
 
 volatile uint32_t seed = 0;
 
@@ -85,6 +86,7 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
     if(delay_clock)
         delay_clock--;
     seed++;
+    inactivity_clock++;
 }
 
 /*
@@ -164,6 +166,18 @@ void POWER_MANAGER_turnOn()
 void POWER_MANAGER_turnOff()
 {
     AUTO_CUTOFF_OUTPORT &= ~(1 << AUTO_CUTOFF_BIT);
+}
+
+void POWER_MANAGER_MonitorInactivity()
+{
+    if( button_state )
+    {
+        inactivity_clock = 0;
+    }
+    if( inactivity_clock >= INACTIVITY_PERIOD )
+    {
+        POWER_MANAGER_turnOff();
+    }
 }
 
 void FB_Clear()
@@ -646,7 +660,6 @@ void GAME_AdjustDifficulty()
 }
 
 // TODO battery monitor
-// TODO inactivity monitor
 int main(void)
 {
     BUTTONS_init();
@@ -670,13 +683,15 @@ int main(void)
     //wait for button press to start the game
     while(!button_state)
     {
-        BUTTONS_monitorButtons(&button_state);
+        BUTTONS_monitorButtons();
+        POWER_MANAGER_MonitorInactivity();
     }
     srand(seed);    // initialize PRNG
 
     while (1)
     {
         BUTTONS_monitorButtons();
+        POWER_MANAGER_MonitorInactivity();
 
         /* GAME OVER */
         if(trex_state == CRASHED)

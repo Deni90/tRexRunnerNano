@@ -60,6 +60,8 @@
 #define TRUE                            1
 #define FALSE                           0
 
+#define INACTIVITY_PERIOD               30000 // mS
+
 typedef enum trex_states_e {
     WAITING = 0, RUNNING, DUCKING, JUMPING, CRASHED
 } trex_states_t;
