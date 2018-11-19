@@ -43,6 +43,7 @@ volatile uint8_t rb_debounce_clock = 0;
 volatile uint16_t game_speed_update_clock = 0;
 volatile uint16_t delay_clock = 0;
 volatile uint16_t inactivity_clock = 0;
+volatile uint16_t battery_monitor_clock = 0;
 
 volatile uint32_t seed = 0;
 
@@ -68,6 +69,8 @@ static uint8_t inverted_mode = FALSE;
 
 static uint32_t EEMEM high_score_backup = 0;
 
+static uint16_t battery_voltage = 0;
+
 // lookup table for pterodactyl flying heights
 static const __flash uint8_t pterodactyl_flying_heights[] = {
         PTERODACTYL_MIN_FLY_HEIGHT,
@@ -87,6 +90,7 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
         delay_clock--;
     seed++;
     inactivity_clock++;
+    battery_monitor_clock++;
 }
 
 /*
@@ -155,7 +159,11 @@ void POWER_MANAGER_init()
     USB_PWR_OUTPORT &= ~(1 << USB_PWR_BIT); // pull down USB_PWR_BIT
     USB_PWR_DDRPORT &= ~(1 << USB_PWR_BIT); // configure USB_PWR_BIT as input
 
-    //TODO init adc
+    // Initializes ADC on ADC0(PC0) for battery voltage monitoring
+    DIDR0 |= (1 << ADC0D);                  // pin 0 disabled
+    ADMUX |= (1 << REFS1) | (1 << REFS0); // Internal 1.1V Voltage Reference with external capacitor at AREF pin
+    ADCSRA |= (1 << ADPS2) | (1 << ADPS1); // ADC Prescaler Select Bits: 125kHz, prescaler: 64
+    ADCSRA |= (1 << ADEN); // ADC Enable
 }
 
 void POWER_MANAGER_turnOn()
@@ -177,6 +185,43 @@ void POWER_MANAGER_MonitorInactivity()
     if( inactivity_clock >= INACTIVITY_PERIOD )
     {
         POWER_MANAGER_turnOff();
+    }
+}
+
+/*
+ * Reads battery voltage by using ADC.
+ * return value: measured value in mV
+ */
+uint16_t POWER_MANAGER_ReadBatteryVoltage()
+{
+    uint16_t read_value = 0;
+    ADMUX &= 0xF8;           // clear existing bottom 3 bits. 000 -> ADC0
+    ADCSRA |= (1 << ADSC);   // start conversion
+    // wait for completion
+    while(ADCSRA & (1 << ADSC))
+        ;
+    read_value = (ADCL | (ADCH << 8));
+    // voltage divider R1 = 10k, R2 = 3k3, ADC: 1v1/1024=1.0742mV
+
+    // FIX when left button is pressed PN junction voltage must be added to read value
+    if(left_button_state())
+        return floor((13300 * 1.0742 * read_value) / 3300) + PN_JUNCTION;
+    return floor((13300 * 1.0742 * read_value) / 3300);
+}
+
+/*
+ * Periodically measures battery voltage and if the voltage is under the
+ * margin notifies the user with some message and turns off the device
+ */
+void POWER_MANAGER_BatteryMonitr()
+{
+    if(battery_monitor_clock >= BATTERY_MONITOR_PERIOD) {
+        battery_monitor_clock = 0;    // reset timer
+        battery_voltage = POWER_MANAGER_ReadBatteryVoltage(); // read battery status
+        if(battery_voltage <= MIN_BATTERY_VOLTAGE) {
+            //TODO show low battery notification;
+            POWER_MANAGER_turnOff();
+        }
     }
 }
 
@@ -659,11 +704,12 @@ void GAME_AdjustDifficulty()
     }
 }
 
-// TODO battery monitor
+// TODO implement startup
+// TODO handle charger connection
+// TODO show charging, full and empty battery notifications
 int main(void)
 {
     BUTTONS_init();
-
     POWER_MANAGER_init();
 
     POWER_MANAGER_turnOn();
@@ -685,6 +731,7 @@ int main(void)
     {
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
+        POWER_MANAGER_BatteryMonitr();
     }
     srand(seed);    // initialize PRNG
 
@@ -692,6 +739,7 @@ int main(void)
     {
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
+        POWER_MANAGER_BatteryMonitr();
 
         /* GAME OVER */
         if(trex_state == CRASHED)

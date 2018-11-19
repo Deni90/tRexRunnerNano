@@ -62,6 +62,10 @@
 
 #define INACTIVITY_PERIOD               30000 // mS
 
+#define MIN_BATTERY_VOLTAGE             3600 // mV
+#define PN_JUNCTION                     600 // mV
+#define BATTERY_MONITOR_PERIOD          30000 // milliseconds
+
 typedef enum trex_states_e {
     WAITING = 0, RUNNING, DUCKING, JUMPING, CRASHED
 } trex_states_t;
