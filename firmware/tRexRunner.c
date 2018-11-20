@@ -580,20 +580,10 @@ void GAME_UpdateJumpingTrex()
     }
 }
 
-void GAME_UpdateChrashedTrex()
-{
-    trex.width = TREX_STANDING_WIDTH;
-    trex.height = TREX_STANDING_HEIGHT;
-    trex.sprite = trex_dead;
-}
-
 void GAME_UpdateTrex()
 {
     switch(trex_state)
     {
-    case WAITING:
-        // TODO implement me
-        break;
     case RUNNING:
         GAME_UpdateRunningTrex();
         break;
@@ -604,10 +594,8 @@ void GAME_UpdateTrex()
         GAME_UpdateJumpingTrex();
         break;
     case CRASHED:
-        GAME_UpdateChrashedTrex();
         break;
     }
-
 
     if(FB_DrawGameObject(trex))
     {

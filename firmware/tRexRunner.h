@@ -67,7 +67,7 @@
 #define BATTERY_MONITOR_PERIOD          30000 // milliseconds
 
 typedef enum trex_states_e {
-    WAITING = 0, RUNNING, DUCKING, JUMPING, CRASHED
+    RUNNING = 0, DUCKING, JUMPING, CRASHED
 } trex_states_t;
 
 typedef struct game_object_s {
@@ -121,7 +121,6 @@ void GAME_InitTrex();
 void GAME_UpdateRunningTrex();
 void GAME_UpdateDuckingTrex();
 void GAME_UpdateJumpingTrex();
-void GAME_UpdateChrashedTrex();
 void GAME_UpdateTrex();
 
 #endif /* TREXRUNNER_H_ */
