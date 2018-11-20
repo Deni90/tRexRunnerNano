@@ -717,8 +717,6 @@ int main(void)
     TIMER_init();
     sei();
 
-    TIMER_delay(1000);
-
     SSD1306_init();
     SSD1306_clear();
 
