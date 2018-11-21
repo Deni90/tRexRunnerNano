@@ -41,11 +41,8 @@ volatile uint16_t global_clock = 0;
 volatile uint8_t lb_debounce_clock = 0;
 volatile uint8_t rb_debounce_clock = 0;
 volatile uint16_t game_speed_update_clock = 0;
-volatile uint16_t delay_clock = 0;
 volatile uint16_t inactivity_clock = 0;
 volatile uint16_t battery_monitor_clock = 0;
-
-volatile uint32_t seed = 0;
 
 static float game_speed = GAME_INITIAL_SPEED;
 static uint32_t high_score = 0;
@@ -86,9 +83,6 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
     lb_debounce_clock++;
     rb_debounce_clock++;
     game_speed_update_clock++;
-    if(delay_clock)
-        delay_clock--;
-    seed++;
     inactivity_clock++;
     battery_monitor_clock++;
 }
@@ -102,12 +96,6 @@ void TIMER_init(void)
     OCR1A = 249;           // OCR1A Timer1's TOP value for 1mS @8Mhz
     TCCR1B |= (1 << CS11) | (1 << CS10); // start Timer1, clkI/O/64 (From prescaler) 125kHz
     TIMSK1 |= (1 << OCIE1A); // Timer/Counter1 Output Compare Match A Interrupt Enable
-}
-
-void TIMER_delay(uint16_t delay)
-{
-    delay_clock = delay;
-    while(delay_clock);
 }
 
 void BUTTONS_init()
@@ -257,7 +245,8 @@ uint8_t FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t
 void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value)
 {
     int16_t xx = x;
-    for (uint32_t dividend = 10000; dividend > 0; dividend /= 10) {
+    for (uint32_t dividend = 10000; dividend > 0; dividend /= 10)
+    {
         FB_DrawImage(xx, y, &digits[(value / dividend % 10) * DIGIT_WIDTH],
                 DIGIT_WIDTH, DIGIT_HEIGHT);
         xx += DIGIT_WIDTH;
@@ -293,6 +282,48 @@ void FB_InvertColor()
     for(uint16_t i = 0; i < (WIDTH * HEIGHT / 8); i++)
     {
         frame_buffer[i] = ~frame_buffer[i];
+    }
+}
+
+void FB_DrawRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8_t fill)
+{
+    if((x >= WIDTH) || (y >= HEIGHT)) return;
+
+    uint8_t a, b;
+
+    if((y + height) > HEIGHT)
+    {
+        a = HEIGHT;
+    }
+    else
+    {
+        a = y + height;
+    }
+
+    if((x + width) > WIDTH)
+     {
+         b = WIDTH;
+     }
+     else
+     {
+         b = x + width;
+     }
+
+    for(uint8_t i = y; i < a; i++)
+    {
+        for(uint8_t j = x; j < b; j++)
+        {
+            if(fill)
+            {
+                FB_SetPixel(j, i);
+            } else
+            {
+                if(i == y || i == (a - 1) || j == x || j == (b - 1))
+                {
+                    FB_SetPixel(j, i);
+                }
+            }
+        }
     }
 }
 
@@ -637,7 +668,7 @@ void GAME_Init()
     show_pterodactyl = SHOW_PTERODACTYL;
     inverted_mode = FALSE;
 
-    srand(seed);    // initialize PRNG
+    srand(global_clock);    // initialize PRNG
 
     GAME_InitHorizon();
     GAME_InitTrex();
@@ -692,7 +723,6 @@ void GAME_AdjustDifficulty()
     }
 }
 
-// TODO implement startup
 // TODO handle charger connection
 // TODO show charging, full and empty battery notifications
 int main(void)
@@ -708,18 +738,63 @@ int main(void)
     SSD1306_init();
     SSD1306_clear();
 
-    GAME_Init();
-
     uint8_t button_released = FALSE;    // used to prevent immediate restart of the game while holding the jumping button
 
-    //wait for button press to start the game
-    while(!button_state)
+    // startup, turning on the device
+    FB_Clear();
+    FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, FALSE);
+    SSD1306_display(frame_buffer);
+
+    global_clock = 0; // reset timer
+    while(1)
     {
+        if(global_clock >= TIMEOUT_INTERVAL)
+        {
+            POWER_MANAGER_turnOff();
+        }
+        BUTTONS_monitorButtons();
+        if(button_state == ((1 << LEFT_BUTTON_BIT) | (1 << RIGHT_BUTTON_BIT)))
+        {
+            global_clock = 0; // reset timer
+            while(global_clock < STARTUP_INTERVAL)
+            {
+                // Update progress bar
+                FB_Clear();
+                FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, FALSE);
+                uint16_t step = STARTUP_INTERVAL / 90;
+                FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, global_clock / step , PROGRESS_BAR_HEIGHT, TRUE);
+                SSD1306_display(frame_buffer);
+                BUTTONS_monitorButtons();
+                // check if the buttons are released in the meantime, if yes turn off the device
+                if(button_state != ((1 << LEFT_BUTTON_BIT) | (1 << RIGHT_BUTTON_BIT)))
+                {
+                    POWER_MANAGER_turnOff();
+                }
+            }
+            break;
+        }
+    }
+
+    // initialize the game
+    GAME_Init();
+
+    // wait for button press to start the game
+    while(1)
+    {
+        if(!(button_state & ( 1 << LEFT_BUTTON_BIT)))
+        {
+            button_released = TRUE;
+        }
+        if(button_state && button_released)
+        {
+            break;
+        }
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
         POWER_MANAGER_BatteryMonitr();
     }
-    srand(seed);    // initialize PRNG
+
+    srand(global_clock);    // initialize PRNG
 
     while (1)
     {

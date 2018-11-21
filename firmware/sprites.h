@@ -8,6 +8,11 @@
 #ifndef SPRITES_H_
 #define SPRITES_H_
 
+#define PROGRESS_BAR_WIDTH          90
+#define PROGRESS_BAR_HEIGHT         5
+#define PROGRESS_BAR_X              19
+#define PROGRESS_BAR_Y              15
+
 #define HORIZON_LINE_WIDTH          128
 #define HORIZON_LINE_HEIGHT         2
 #define HORIZON_LINE_BUMP1_X        40
@@ -20,7 +25,6 @@
 #define TREX_STANDING_CLEARENCE_MAX 9
 #define TREX_DUCKING_CLEARENCE_MIN  3
 #define TREX_DUCKING_CLEARENCE_MAX  10
-
 
 #define TREX_STANDING_WIDTH     14
 #define TREX_STANDING_HEIGHT    14

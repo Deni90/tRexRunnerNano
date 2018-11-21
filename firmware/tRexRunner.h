@@ -60,6 +60,9 @@
 #define TRUE                            1
 #define FALSE                           0
 
+#define TIMEOUT_INTERVAL                1000 // mS
+#define STARTUP_INTERVAL                1000 // mS
+
 #define INACTIVITY_PERIOD               30000 // mS
 
 #define MIN_BATTERY_VOLTAGE             3600 // mV
@@ -97,6 +100,7 @@ uint8_t FB_DrawGameObject(game_object_t game_object);
 void FB_SetPixel(uint8_t x, uint8_t y);
 void FB_ClearPixel(uint8_t x, uint8_t y);
 void FB_InvertColor();
+void FB_DrawRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8_t fill);
 
 void GAME_Init();
 void GAME_ShowScore();
