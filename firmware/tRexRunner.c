@@ -154,15 +154,9 @@ void POWER_MANAGER_init()
     ADCSRA |= (1 << ADEN); // ADC Enable
 }
 
-void POWER_MANAGER_turnOn()
-{
-    AUTO_CUTOFF_OUTPORT |= (1 << AUTO_CUTOFF_BIT);
-}
+#define POWER_MANAGER_turnOn() AUTO_CUTOFF_OUTPORT |= (1 << AUTO_CUTOFF_BIT);
 
-void POWER_MANAGER_turnOff()
-{
-    AUTO_CUTOFF_OUTPORT &= ~(1 << AUTO_CUTOFF_BIT);
-}
+#define POWER_MANAGER_turnOff() AUTO_CUTOFF_OUTPORT &= ~(1 << AUTO_CUTOFF_BIT);
 
 void POWER_MANAGER_MonitorInactivity()
 {
@@ -266,15 +260,6 @@ void FB_SetPixel(uint8_t x, uint8_t y)
     if((x >= WIDTH) || (y >= HEIGHT)) return;
     uint16_t buffer_index = WIDTH * (y / 8) + x;
     frame_buffer[buffer_index] |= (1 << (y % 8));
-
-}
-
-void FB_ClearPixel(uint8_t x, uint8_t y)
-{
-    if((x >= WIDTH) || (y >= HEIGHT)) return;
-    uint16_t buffer_index = WIDTH * (y / 8) + x;
-    frame_buffer[buffer_index] &= ~(1 << (y % 8));
-
 }
 
 void FB_InvertColor()
@@ -641,25 +626,12 @@ void GAME_ShowScore()
     FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 5 - 1, HI_SCORE_Y, score);
 }
 
-void GAME_BackupHighScore()
+void GAME_Init()
 {
-    cli();
-    eeprom_write_block(&high_score, &high_score_backup, sizeof(high_score_backup));
-    sei();
-}
-
-void GAME_RestoreHighScore()
-{
+    score = 0;
     cli();
     eeprom_read_block(&high_score, &high_score_backup, sizeof(high_score_backup));
     sei();
-}
-
-void GAME_Init()
-{
-
-    score = 0;
-    GAME_RestoreHighScore();
     game_speed = GAME_INITIAL_SPEED;
     trex_state = RUNNING;
     latest_cactus = 0; // index of the newest cactus in the array
@@ -824,7 +796,9 @@ int main(void)
                 if(score > high_score)
                 {
                     high_score = score;
-                    GAME_BackupHighScore();
+                    cli();
+                    eeprom_write_block(&high_score, &high_score_backup, sizeof(high_score_backup));
+                    sei();
                 }
                 continue;
             }
@@ -838,7 +812,7 @@ int main(void)
 
             FB_Clear();
 
-            GAME_ShowScore(high_score, score);
+            GAME_ShowScore();
 
             GAME_UpdateHorizon();
 

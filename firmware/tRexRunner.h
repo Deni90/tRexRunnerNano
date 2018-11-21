@@ -98,14 +98,11 @@ uint8_t FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t
 void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value);
 uint8_t FB_DrawGameObject(game_object_t game_object);
 void FB_SetPixel(uint8_t x, uint8_t y);
-void FB_ClearPixel(uint8_t x, uint8_t y);
 void FB_InvertColor();
 void FB_DrawRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8_t fill);
 
 void GAME_Init();
 void GAME_ShowScore();
-void GAME_BackupHighScore();
-void GAME_RestoreHighScore();
 void GAME_HandleState();
 void GAME_AdjustDifficulty();
 
