@@ -315,7 +315,7 @@ void FB_DrawRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8
 void GAME_InitHorizon()
 {
     horizon.x = 0;
-    horizon.y = HEIGHT - HORIZON_LINE_HEIGHT - 1;
+    horizon.y = HEIGHT - HORIZON_LINE_HEIGHT;
     horizon.width = HORIZON_LINE_WIDTH;
     horizon.height = HORIZON_LINE_HEIGHT;
     horizon.bump1_x = HORIZON_LINE_BUMP1_X;
