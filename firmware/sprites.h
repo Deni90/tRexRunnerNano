@@ -26,6 +26,9 @@
 #define TREX_DUCKING_CLEARENCE_MIN  3
 #define TREX_DUCKING_CLEARENCE_MAX  10
 
+#define BATTERY_ICON_WITH           32
+#define BATTERY_ICON_HEIGHT         16
+
 #define TREX_STANDING_WIDTH     14
 #define TREX_STANDING_HEIGHT    14
 static const __flash uint8_t trex_standing_init[] =

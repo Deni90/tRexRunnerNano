@@ -66,8 +66,9 @@
 #define INACTIVITY_PERIOD               30000 // mS
 
 #define MIN_BATTERY_VOLTAGE             3600 // mV
-#define PN_JUNCTION                     600 // mV
 #define BATTERY_MONITOR_PERIOD          30000 // milliseconds
+
+#define LOW_BATTERY_ALERT_DURATION      1500 // mS
 
 typedef enum trex_states_e {
     RUNNING = 0, DUCKING, JUMPING, CRASHED
@@ -92,6 +93,17 @@ typedef struct horizon_s {
     float bump2_x;
     uint8_t bump2_width;
 } horizon_t;
+
+void TIMER_init();
+
+void BUTTONS_init();
+void BUTTONS_monitorButtons();
+
+void POWER_MANAGER_init();
+void POWER_MANAGER_MonitorInactivity();
+uint16_t POWER_MANAGER_ReadBatteryVoltage();
+void POWER_MANAGER_MonitorBattery();
+void POWER_MANAGER_ShowBatteryStatus(uint8_t progress);
 
 void FB_Clear();
 uint8_t FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);

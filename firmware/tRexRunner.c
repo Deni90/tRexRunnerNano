@@ -28,12 +28,14 @@
 #define CHG_PIN_INPORT           CONCAT_EXP(PIN, CHG_PIN_IOPORTNAME)
 #define CHG_PIN_DDRPORT          CONCAT_EXP(DDR, CHG_PIN_IOPORTNAME)
 
-#define AUTO_CUTOFF_OUTPORT          CONCAT_EXP(PORT, AUTO_CUTOFF_IOPORTNAME)
-#define AUTO_CUTOFF_INPORT           CONCAT_EXP(PIN, AUTO_CUTOFF_IOPORTNAME)
-#define AUTO_CUTOFF_DDRPORT          CONCAT_EXP(DDR, AUTO_CUTOFF_IOPORTNAME)
+#define AUTO_CUTOFF_OUTPORT      CONCAT_EXP(PORT, AUTO_CUTOFF_IOPORTNAME)
+#define AUTO_CUTOFF_INPORT       CONCAT_EXP(PIN, AUTO_CUTOFF_IOPORTNAME)
+#define AUTO_CUTOFF_DDRPORT      CONCAT_EXP(DDR, AUTO_CUTOFF_IOPORTNAME)
 
 #define left_button_state()     (!(BUTTON_INPORT & (1 << LEFT_BUTTON_BIT)))
 #define right_button_state()    (!(BUTTON_INPORT & (1 << RIGHT_BUTTON_BIT)))
+#define is_usb_connected()      (USB_PWR_INPORT & (1 << USB_PWR_BIT))
+#define is_charging_battery()   (!(CHG_PIN_INPORT & (1 << CHG_PIN_BIT)))
 
 static uint8_t frame_buffer[WIDTH * HEIGHT / 8];
 
@@ -90,7 +92,7 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
 /*
  * Initialize Timer1
  */
-void TIMER_init(void)
+void TIMER_init()
 {
     TCCR1B |= (1 << WGM12); // CTC mode of Timer1
     OCR1A = 249;           // OCR1A Timer1's TOP value for 1mS @8Mhz
@@ -141,7 +143,7 @@ void POWER_MANAGER_init()
     AUTO_CUTOFF_OUTPORT &= ~(1 << AUTO_CUTOFF_BIT); // pull down AUTO_CUTOFF_BIT
     AUTO_CUTOFF_DDRPORT |= (1 << AUTO_CUTOFF_BIT); // configure AUTO_CUTOFF_BIT as output
 
-    CHG_PIN_OUTPORT &= ~(1 << CHG_PIN_BIT); // pull down CHG_PIN_BIT
+    CHG_PIN_OUTPORT |= (1 << CHG_PIN_BIT); // pull up CHG_PIN_BIT
     CHG_PIN_DDRPORT &= ~(1 << CHG_PIN_BIT); // configure CHG_PIN_BIT as input
 
     USB_PWR_OUTPORT &= ~(1 << USB_PWR_BIT); // pull down USB_PWR_BIT
@@ -194,14 +196,31 @@ uint16_t POWER_MANAGER_ReadBatteryVoltage()
  */
 void POWER_MANAGER_MonitorBattery()
 {
-    if(battery_monitor_clock >= BATTERY_MONITOR_PERIOD) {
+    if(battery_monitor_clock >= BATTERY_MONITOR_PERIOD)
+    {
         battery_monitor_clock = 0;    // reset timer
         battery_voltage = POWER_MANAGER_ReadBatteryVoltage(); // read battery status
-        if(battery_voltage <= MIN_BATTERY_VOLTAGE) {
-            //TODO show low battery notification;
+        if(battery_voltage <= MIN_BATTERY_VOLTAGE)
+        {
+            POWER_MANAGER_ShowBatteryStatus(0);
+            global_clock = 0;
+            while(global_clock < LOW_BATTERY_ALERT_DURATION);
             POWER_MANAGER_turnOff();
         }
     }
+}
+
+void POWER_MANAGER_ShowBatteryStatus(uint8_t progress)
+{
+    uint8_t x = (WIDTH - BATTERY_ICON_WITH) / 2;
+    uint8_t y = (HEIGHT - BATTERY_ICON_HEIGHT) / 2;
+
+    FB_Clear();
+    FB_DrawRectangle(x + 2, y + 0, 30, 16, FALSE);
+    FB_DrawRectangle(x + 0, y + 4, 2, 8, TRUE);
+
+    FB_DrawRectangle(x+ 6, y + 4, progress * 22 / UINT8_MAX, 8, TRUE);
+    SSD1306_display(frame_buffer);
 }
 
 void FB_Clear()
@@ -692,9 +711,7 @@ void GAME_AdjustDifficulty()
     }
 }
 
-// TODO handle charger connection
-// TODO show charging, full and empty battery notifications
-int main(void)
+int main()
 {
     BUTTONS_init();
     POWER_MANAGER_init();
@@ -708,6 +725,36 @@ int main(void)
     SSD1306_clear();
 
     uint8_t button_released = FALSE;    // used to prevent immediate restart of the game while holding the jumping button
+
+    // check is the device powered via USB (Charging the battery)
+    if(is_usb_connected())
+    {
+        uint8_t bar = 0;
+        while(is_charging_battery())
+        {
+            // charging in progress
+            if(global_clock >= 10)
+            {
+                global_clock = 0;
+                POWER_MANAGER_ShowBatteryStatus(++bar);
+            }
+        }
+        // battery is full
+        POWER_MANAGER_ShowBatteryStatus(UINT8_MAX);
+    }
+
+    // wait until the USB is connected
+    while(is_usb_connected());
+
+    // before startup check the battery status: if low -> turn off the device
+    battery_voltage = POWER_MANAGER_ReadBatteryVoltage();
+    if( battery_voltage < MIN_BATTERY_VOLTAGE)
+    {
+        POWER_MANAGER_ShowBatteryStatus(0);
+        global_clock = 0;
+        while(global_clock < LOW_BATTERY_ALERT_DURATION);
+        POWER_MANAGER_turnOff();
+    }
 
     // startup, turning on the device
     FB_Clear();
