@@ -183,11 +183,8 @@ uint16_t POWER_MANAGER_ReadBatteryVoltage()
     while(ADCSRA & (1 << ADSC))
         ;
     read_value = (ADCL | (ADCH << 8));
-    // voltage divider R1 = 10k, R2 = 3k3, ADC: 1v1/1024=1.0742mV
 
-    // FIX when left button is pressed PN junction voltage must be added to read value
-    if(left_button_state())
-        return floor((13300 * 1.0742 * read_value) / 3300) + PN_JUNCTION;
+    // voltage divider R1 = 10k, R2 = 3k3, ADC: 1v1/1024=1.0742mV
     return floor((13300 * 1.0742 * read_value) / 3300);
 }
 
@@ -195,7 +192,7 @@ uint16_t POWER_MANAGER_ReadBatteryVoltage()
  * Periodically measures battery voltage and if the voltage is under the
  * margin notifies the user with some message and turns off the device
  */
-void POWER_MANAGER_BatteryMonitr()
+void POWER_MANAGER_MonitorBattery()
 {
     if(battery_monitor_clock >= BATTERY_MONITOR_PERIOD) {
         battery_monitor_clock = 0;    // reset timer
@@ -763,7 +760,7 @@ int main(void)
         }
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
-        POWER_MANAGER_BatteryMonitr();
+        POWER_MANAGER_MonitorBattery();
     }
 
     srand(global_clock);    // initialize PRNG
@@ -772,7 +769,7 @@ int main(void)
     {
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
-        POWER_MANAGER_BatteryMonitr();
+        POWER_MANAGER_MonitorBattery();
 
         /* GAME OVER */
         if(trex_state == CRASHED)
