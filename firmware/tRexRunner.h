@@ -32,7 +32,7 @@
 #define OBSTACLE_RESPAWN_DISTANCE_INC   5   // px
 #define SHOW_PTERODACTYL                120 // px
 
-#define GAME_GRAVITY                    3.2f
+#define GAME_GRAVITY                    3.1f
 #define GAME_INITIAL_SPEED              3.8f
 #define GAME_SPEED_DELTA                0.4f
 #define JUMPING_SPEED                   3.5f
