@@ -356,7 +356,7 @@ void GAME_UpdateHorizon()
         if(trex_state == JUMPING &&
                 (i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
                 (i < trex.x + TREX_STANDING_CLEARENCE_MAX) &&
-                (trex.y > trex.height - 1))
+                (trex.y > trex.height + 1))
             continue;
         if(trex_state == DUCKING &&
                 (i >= trex.x + TREX_DUCKING_CLEARENCE_MIN) &&
