@@ -784,7 +784,9 @@ int main()
                 // check if the buttons are released in the meantime, if yes turn off the device
                 if(button_state != ((1 << LEFT_BUTTON_BIT) | (1 << RIGHT_BUTTON_BIT)))
                 {
+                    SSD1306_clear();
                     POWER_MANAGER_turnOff();
+                    while(1); //wait until the device is powered off
                 }
             }
             break;
