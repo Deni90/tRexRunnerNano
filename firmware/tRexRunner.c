@@ -95,7 +95,7 @@ ISR(TIMER1_COMPA_vect, ISR_NOBLOCK)
 void TIMER_init()
 {
     TCCR1B |= (1 << WGM12); // CTC mode of Timer1
-    OCR1A = 249;           // OCR1A Timer1's TOP value for 1mS @8Mhz
+    OCR1A = 124;           // OCR1A Timer1's TOP value for 1mS @8Mhz
     TCCR1B |= (1 << CS11) | (1 << CS10); // start Timer1, clkI/O/64 (From prescaler) 125kHz
     TIMSK1 |= (1 << OCIE1A); // Timer/Counter1 Output Compare Match A Interrupt Enable
 }
