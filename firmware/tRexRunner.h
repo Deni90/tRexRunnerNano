@@ -32,8 +32,8 @@
 #define OBSTACLE_RESPAWN_DISTANCE_INC   5   // px
 #define SHOW_PTERODACTYL                120 // px
 
-#define GAME_GRAVITY                    3.1f
-#define GAME_INITIAL_SPEED              3.8f
+#define GAME_GRAVITY                    3.2f
+#define GAME_INITIAL_SPEED              3.9f
 #define GAME_SPEED_DELTA                0.4f
 #define JUMPING_SPEED                   3.5f
 #define GAME_SCORE_INCREMENT            50 // mS
@@ -60,7 +60,7 @@
 #define TRUE                            1
 #define FALSE                           0
 
-#define TIMEOUT_INTERVAL                1000 // mS
+#define TIMEOUT_INTERVAL                2000 // mS
 #define STARTUP_INTERVAL                1000 // mS
 
 #define INACTIVITY_PERIOD               30000 // mS
