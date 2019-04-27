@@ -2513,7 +2513,7 @@ design rules under a new name.</description>
 <attribute name="VALUE" x="34.035" y="19.082" size="1.27" layer="28" rot="MR0"/>
 </element>
 <element name="SSD1306" library="pinhead" library_urn="urn:adsk.eagle:library:325" package="1X04" package3d_urn="urn:adsk.eagle:package:22407/2" value="" x="3.556" y="22.686" smashed="yes" rot="R270">
-<attribute name="NAME" x="31.79" y="27.178" size="1.016" layer="25" font="vector"/>
+<attribute name="NAME" x="34.29" y="27.178" size="1.016" layer="25" font="vector"/>
 <attribute name="VALUE" x="0.381" y="27.766" size="1.27" layer="27" rot="R270"/>
 </element>
 <element name="VCC" library="testpad" library_urn="urn:adsk.eagle:library:385" package="TP12R" package3d_urn="urn:adsk.eagle:package:27963/1" value="TPTP12R" x="38.608" y="12.446" smashed="yes" rot="MR0">
