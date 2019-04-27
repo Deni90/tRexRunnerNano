@@ -8,6 +8,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
+#include <avr/wdt.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -715,12 +716,10 @@ int main()
 {
     BUTTONS_init();
     POWER_MANAGER_init();
-
     POWER_MANAGER_turnOn();
-
     TIMER_init();
     sei();
-
+    wdt_enable(WDTO_1S); // enable 1s watchdog timer
     SSD1306_init();
     SSD1306_clear();
 
@@ -732,6 +731,7 @@ int main()
         uint8_t bar = 0;
         while(is_charging_battery())
         {
+            wdt_reset(); // keep the watchdog happy
             // charging in progress
             if(global_clock >= 10)
             {
@@ -744,7 +744,10 @@ int main()
     }
 
     // wait until the USB is connected
-    while(is_usb_connected());
+    while(is_usb_connected())
+    {
+        wdt_reset(); // keep the watchdog happy
+    }
 
     // before startup check the battery status: if low -> turn off the device
     battery_voltage = POWER_MANAGER_ReadBatteryVoltage();
@@ -752,7 +755,10 @@ int main()
     {
         POWER_MANAGER_ShowBatteryStatus(0);
         global_clock = 0;
-        while(global_clock < LOW_BATTERY_ALERT_DURATION);
+        while(global_clock < LOW_BATTERY_ALERT_DURATION)
+        {
+            wdt_reset(); // keep the watchdog happy
+        }
         POWER_MANAGER_turnOff();
     }
 
@@ -767,6 +773,7 @@ int main()
         if(global_clock >= TIMEOUT_INTERVAL)
         {
             POWER_MANAGER_turnOff();
+            while(1); //wait until the device is powered off
         }
         BUTTONS_monitorButtons();
         if(button_state == ((1 << LEFT_BUTTON_BIT) | (1 << RIGHT_BUTTON_BIT)))
@@ -774,6 +781,7 @@ int main()
             global_clock = 0; // reset timer
             while(global_clock < STARTUP_INTERVAL)
             {
+                wdt_reset(); // keep the watchdog happy
                 // Update progress bar
                 FB_Clear();
                 FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, FALSE);
@@ -784,7 +792,6 @@ int main()
                 // check if the buttons are released in the meantime, if yes turn off the device
                 if(button_state != ((1 << LEFT_BUTTON_BIT) | (1 << RIGHT_BUTTON_BIT)))
                 {
-                    SSD1306_clear();
                     POWER_MANAGER_turnOff();
                     while(1); //wait until the device is powered off
                 }
@@ -795,6 +802,12 @@ int main()
 
     // initialize the game
     GAME_Init();
+
+    global_clock = 0;
+    while( global_clock <= STARTUP_INTERVAL )
+    {
+        wdt_reset(); // keep the watchdog happy
+    }
 
     // wait for button press to start the game
     while(1)
@@ -807,6 +820,7 @@ int main()
         {
             break;
         }
+        wdt_reset(); // keep the watchdog happy
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
         POWER_MANAGER_MonitorBattery();
@@ -819,7 +833,7 @@ int main()
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
         POWER_MANAGER_MonitorBattery();
-
+        wdt_reset(); // keep the watchdog happy
         /* GAME OVER */
         if(trex_state == CRASHED)
         {
