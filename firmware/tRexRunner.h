@@ -36,7 +36,7 @@
 #define GAME_INITIAL_SPEED              3.9f
 #define GAME_SPEED_DELTA                0.4f
 #define JUMPING_SPEED                   3.5f
-#define GAME_SCORE_INCREMENT            50 // mS
+#define GAME_SCORE_INCREMENT            70 // mS
 
 #define INVERTED_MODE_THRESHOLD         1000
 
@@ -60,7 +60,7 @@
 #define TRUE                            1
 #define FALSE                           0
 
-#define TIMEOUT_INTERVAL                2000 // mS
+#define TIMEOUT_INTERVAL                1500 // mS
 #define STARTUP_INTERVAL                1000 // mS
 
 #define INACTIVITY_PERIOD               30000 // mS
