@@ -808,6 +808,7 @@ int main()
     {
         wdt_reset(); // keep the watchdog happy
     }
+    button_state = 0; // clear to prevent early starting...
 
     // wait for button press to start the game
     while(1)
