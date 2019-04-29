@@ -803,12 +803,13 @@ int main()
     // initialize the game
     GAME_Init();
 
-    global_clock = 0;
-    while( global_clock <= STARTUP_INTERVAL )
+    // wait until the buttons are released to prevent automatic start of the game
+    while(button_state)
     {
         wdt_reset(); // keep the watchdog happy
+        BUTTONS_monitorButtons();
+        POWER_MANAGER_MonitorBattery();
     }
-    button_state = 0; // clear to prevent early starting...
 
     // wait for button press to start the game
     while(1)
