@@ -20,7 +20,7 @@ help:
 	@echo "make program ....... to flash fuses irmware and eeprom"
 	@echo "make fuse .......... to flash the fuses"
 	@echo "make flash ......... to flash the firmware (use this on metaboard)"
-	@echo "make flash_eeprom .. to flash the eeprom image"
+	@echo "make eeprom ........ to load the eeprom image"
 	@echo "make clean ..... to delete objects and hex file"
 
 hex: main.hex
@@ -40,7 +40,7 @@ flash: main.hex
 	$(AVRDUDE) -U flash:w:main.hex:i
 
 # rule for uploading eeprom:
-flash_eeprom: main.eep
+eeprom: main.eep
 	$(AVRDUDE) -U eeprom:w:main.eep:i
 
 # rule for deleting dependent files (those which can be built by Make):

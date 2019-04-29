@@ -30,7 +30,7 @@ By default it is set to usbasp.
 ```
 PROGRAMMER = usbasp
 ```
-To flash both fuses and firmware:
+To flash fuses, firmware and eeprom:
 ```
 cd firmware
 make program
