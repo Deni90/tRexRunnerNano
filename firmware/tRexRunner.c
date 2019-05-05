@@ -820,6 +820,7 @@ int main()
         }
         if(button_state && button_released)
         {
+            button_released = FALSE;
             break;
         }
         wdt_reset(); // keep the watchdog happy
