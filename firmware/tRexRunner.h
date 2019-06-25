@@ -70,6 +70,8 @@
 
 #define LOW_BATTERY_ALERT_DURATION      1500 // mS
 
+#define HIGH_SCORE_RESET_TIME           10000 //mS
+
 typedef enum trex_states_e {
     RUNNING = 0, DUCKING, JUMPING, CRASHED
 } trex_states_t;

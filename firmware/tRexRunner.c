@@ -804,8 +804,21 @@ int main()
     GAME_Init();
 
     // wait until the buttons are released to prevent automatic start of the game
+    global_clock = 0;
     while(button_state)
     {
+        if((button_state & (1 << LEFT_BUTTON_BIT)) &&
+                (button_state & (1 << RIGHT_BUTTON_BIT)))
+        {
+            if(global_clock >= HIGH_SCORE_RESET_TIME && high_score != 0)
+            {
+                cli();
+                high_score = 0;
+                eeprom_write_block(&high_score, &high_score_backup, sizeof(high_score_backup));
+                sei();
+                GAME_Init();
+            }
+        }
         wdt_reset(); // keep the watchdog happy
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorBattery();
