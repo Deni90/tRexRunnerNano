@@ -207,6 +207,7 @@ void POWER_MANAGER_MonitorBattery()
             global_clock = 0;
             while(global_clock < LOW_BATTERY_ALERT_DURATION);
             POWER_MANAGER_turnOff();
+            while(1); //wait until the device is powered off
         }
     }
 }
@@ -711,7 +712,6 @@ void GAME_AdjustDifficulty()
 
 int main()
 {
-    BUTTONS_init();
     POWER_MANAGER_init();
     POWER_MANAGER_turnOn();
     TIMER_init();
@@ -773,12 +773,14 @@ int main()
             wdt_reset(); // keep the watchdog happy
         }
         POWER_MANAGER_turnOff();
+        while(1); //wait until the device is powered off
     }
 
     // startup, turning on the device
     FB_Clear();
     FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, FALSE);
     SSD1306_display(frame_buffer);
+    BUTTONS_init();
 
     global_clock = 0; // reset timer
     while(1)
@@ -857,7 +859,7 @@ int main()
 
     srand(global_clock);    // initialize PRNG
 
-    while (1)
+    while(1)
     {
         BUTTONS_monitorButtons();
         POWER_MANAGER_MonitorInactivity();
