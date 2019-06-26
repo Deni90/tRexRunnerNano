@@ -105,7 +105,7 @@ void POWER_MANAGER_init();
 void POWER_MANAGER_MonitorInactivity();
 uint16_t POWER_MANAGER_ReadBatteryVoltage();
 void POWER_MANAGER_MonitorBattery();
-void POWER_MANAGER_ShowBatteryStatus(uint8_t progress);
+void POWER_MANAGER_ShowBatteryStatus(uint8_t x, uint8_t y, uint8_t progress);
 
 void FB_Clear();
 uint8_t FB_DrawImage(int16_t x, int16_t y, const __flash uint8_t* image, uint8_t width, uint8_t height);

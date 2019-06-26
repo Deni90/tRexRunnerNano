@@ -203,7 +203,7 @@ void POWER_MANAGER_MonitorBattery()
         battery_voltage = POWER_MANAGER_ReadBatteryVoltage(); // read battery status
         if(battery_voltage <= MIN_BATTERY_VOLTAGE)
         {
-            POWER_MANAGER_ShowBatteryStatus(0);
+            POWER_MANAGER_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2, (HEIGHT - BATTERY_ICON_HEIGHT) / 2, 0);
             global_clock = 0;
             while(global_clock < LOW_BATTERY_ALERT_DURATION);
             POWER_MANAGER_turnOff();
@@ -211,11 +211,8 @@ void POWER_MANAGER_MonitorBattery()
     }
 }
 
-void POWER_MANAGER_ShowBatteryStatus(uint8_t progress)
+void POWER_MANAGER_ShowBatteryStatus(uint8_t x, uint8_t y, uint8_t progress)
 {
-    uint8_t x = (WIDTH - BATTERY_ICON_WITH) / 2;
-    uint8_t y = (HEIGHT - BATTERY_ICON_HEIGHT) / 2;
-
     FB_Clear();
     FB_DrawRectangle(x + 2, y + 0, 30, 16, FALSE);
     FB_DrawRectangle(x + 0, y + 4, 2, 8, TRUE);
@@ -725,27 +722,43 @@ int main()
 
     uint8_t button_released = FALSE;    // used to prevent immediate restart of the game while holding the jumping button
 
-    // check is the device powered via USB (Charging the battery)
-    if(is_usb_connected())
+    uint8_t bar = 0;
+    uint8_t battery_x = (WIDTH - BATTERY_ICON_WITH) / 2;
+    uint8_t battery_y = (HEIGHT - BATTERY_ICON_HEIGHT) / 2;
+    // wait until the USB is connected
+    while(is_usb_connected())
     {
-        uint8_t bar = 0;
-        while(is_charging_battery())
+        if(is_charging_battery())
         {
-            wdt_reset(); // keep the watchdog happy
             // charging in progress
             if(global_clock >= 10)
             {
                 global_clock = 0;
-                POWER_MANAGER_ShowBatteryStatus(++bar);
+                POWER_MANAGER_ShowBatteryStatus(battery_x, battery_y, ++bar);
+                if(bar == 0)
+                {
+                    battery_x += 10;
+                    if(battery_x >= (WIDTH - BATTERY_ICON_WITH))
+                    {
+                        battery_x = 0;
+                    }
+                }
             }
         }
-        // battery is full
-        POWER_MANAGER_ShowBatteryStatus(UINT8_MAX);
-    }
-
-    // wait until the USB is connected
-    while(is_usb_connected())
-    {
+        else
+        {
+            // battery is full
+            if(global_clock >= 2550)
+            {
+                global_clock = 0;
+                POWER_MANAGER_ShowBatteryStatus(battery_x, battery_y, UINT8_MAX);
+                battery_x += 10;
+                if(battery_x >= (WIDTH - BATTERY_ICON_WITH))
+                {
+                    battery_x = 0;
+                }
+            }
+        }
         wdt_reset(); // keep the watchdog happy
     }
 
@@ -753,7 +766,7 @@ int main()
     battery_voltage = POWER_MANAGER_ReadBatteryVoltage();
     if( battery_voltage < MIN_BATTERY_VOLTAGE)
     {
-        POWER_MANAGER_ShowBatteryStatus(0);
+        POWER_MANAGER_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2, (HEIGHT - BATTERY_ICON_HEIGHT) / 2, 0);
         global_clock = 0;
         while(global_clock < LOW_BATTERY_ALERT_DURATION)
         {
