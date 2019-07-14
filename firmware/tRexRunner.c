@@ -883,14 +883,15 @@ int main()
                         10, game_over_splash, GAME_OVER_SPLASH_WIDTH,
                         GAME_OVER_SPLASH_HEIGHT);
                 if(inverted_mode) FB_InvertColor(); // invert back
-                SSD1306_display(frame_buffer);
                 if(score > high_score)
                 {
+                    SSD1306_clear();
                     high_score = score;
                     cli();
                     eeprom_write_block(&high_score, &high_score_backup, sizeof(high_score_backup));
                     sei();
                 }
+                SSD1306_display(frame_buffer);
                 continue;
             }
         }

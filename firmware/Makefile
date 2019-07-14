@@ -1,7 +1,7 @@
 DEVICE  = atmega88
 F_CPU   = 8000000      # in Hz
 FUSE_L  = 0xe2
-FUSE_H  = 0xdf
+FUSE_H  = 0xdd
 
 PROGRAMMER = usbasp
 
