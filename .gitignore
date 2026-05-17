@@ -1,8 +1,8 @@
-*.cproject
-*.project
-*.settings
-*Release
-*.o
+*.bin
+*.lst
+*.map
 *.elf
-*.eep
 *.hex
+.history
+.DS_Store
+hardware/tRexRunnerNano-backups/
