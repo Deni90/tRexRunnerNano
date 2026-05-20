@@ -409,26 +409,57 @@ static uint32_t FLASH_Read_u32(uint32_t address) {
 }
 
 static void FLASH_Write_u32(uint32_t address, uint32_t val) {
-    // 1. Unlock Flash
+    // Code borrowed from ch32fun/examples/flashtest/flashtest.c
+
+    // Unkock flash - be aware you need extra stuff for the bootloader.
     FLASH->KEYR = FLASH_KEY1;
     FLASH->KEYR = FLASH_KEY2;
+
+    // For option bytes.
+    // FLASH->OBKEYR = FLASH_KEY1;
+    // FLASH->OBKEYR = FLASH_KEY2;
+
+    // For unlocking programming, in general.
     FLASH->MODEKEYR = FLASH_KEY1;
     FLASH->MODEKEYR = FLASH_KEY2;
 
-    // 2. Erase page before programming
+    printf("FLASH->CTLR = %08lx\n", FLASH->CTLR);
+    if (FLASH->CTLR & 0x8080) {
+        while (1)
+            ;
+    }
+
+    uint32_t* ptr = (uint32_t*) address;
+
+    // Erase Page
     FLASH->CTLR = CR_PAGE_ER;
-    FLASH->ADDR = address;
+    FLASH->ADDR = (intptr_t) ptr;
     FLASH->CTLR = CR_STRT_Set | CR_PAGE_ER;
     while (FLASH->STATR & FLASH_STATR_BSY)
-        ;
+        ;   // Takes about 3ms.
 
-    // 3. Program Word
-    FLASH->CTLR = CR_PAGE_PG;
-    *(volatile uint32_t*) address = val;
+    // Clear buffer and prep for flashing.
+    FLASH->CTLR = CR_PAGE_PG;   // synonym of FTPG.
+    FLASH->CTLR = CR_BUF_RST | CR_PAGE_PG;
+    FLASH->ADDR = (intptr_t)
+        ptr;   // This can actually happen about anywhere toward the end here.
+
+    // Note: It takes about 6 clock cycles for this to finish.
+    while (FLASH->STATR & FLASH_STATR_BSY)
+        ;   // No real need for this.
+
+    *ptr = val;                                       // Write to the memory
+    FLASH->CTLR = CR_PAGE_PG | FLASH_CTLR_BUF_LOAD;   // Load the buffer.
+    while (FLASH->STATR & FLASH_STATR_BSY)
+        ;   // Only needed if running from RAM.
+
+    // Actually write the flash out. (Takes about 3ms)
+    FLASH->CTLR = CR_PAGE_PG | CR_STRT_Set;
+
     while (FLASH->STATR & FLASH_STATR_BSY)
         ;
 
-    // 4. Lock Flash
+    // Lock Flash
     FLASH->CTLR |= FLASH_CTLR_LOCK;
 }
 
