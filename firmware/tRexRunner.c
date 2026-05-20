@@ -54,6 +54,8 @@
 #define DUCK_BUTTON_GPIO         PC4
 #define IS_DUCK_BUTTON_PRESSED() (button_state & (1 << DUCK_BUTTON_BIT))
 
+#define AUTOCUTOFF_GPIO PD3
+
 #define TIMEOUT_INTERVAL  1500    // mS
 #define STARTUP_INTERVAL  1000    // mS
 #define INACTIVITY_PERIOD 30000   // mS
@@ -109,6 +111,14 @@ static void BUTTONS_MonitorButtons();
 
 static uint32_t FLASH_Read_u32(uint32_t address);
 static void FLASH_Write_u32(uint32_t address, uint32_t val);
+
+static void POWER_MANAGER_init();
+static void POWER_MANAGER_turnOff();
+static void POWER_MANAGER_MonitorInactivity();
+static uint16_t POWER_MANAGER_ReadBatteryVoltage();
+static void POWER_MANAGER_MonitorBattery();
+static void POWER_MANAGER_ShowBatteryStatus(uint8_t x, uint8_t y,
+                                            uint8_t progress);
 
 static void FB_Clear();
 static uint8_t FB_DrawImage(int16_t x, int16_t y, const uint8_t* image,
@@ -178,7 +188,7 @@ static uint16_t show_pterodactyl = SHOW_PTERODACTYL;
 
 static uint8_t inverted_mode = false;
 
-// static uint16_t battery_voltage = 0;
+static uint16_t battery_voltage = 0;
 
 // lookup table for pterodactyl flying heights
 static const uint8_t pterodactyl_flying_heights[] = {
@@ -211,6 +221,7 @@ int main() {
 
     BUTTONS_Init();
     TIMER_Init();
+    POWER_MANAGER_init();
 
     Delay_Ms(100);   // give OLED some more time
 
@@ -450,6 +461,102 @@ static void BUTTONS_MonitorButtons() {
                !funDigitalRead(DUCK_BUTTON_GPIO)) {
         rb_debounce_clock = 0;
     }
+}
+
+static void POWER_MANAGER_init() {
+    // TODO initialize GPIO pins
+    funPinMode(AUTOCUTOFF_GPIO, GPIO_CFGLR_IN_PUPD);
+    funDigitalWrite(AUTOCUTOFF_GPIO, FUN_HIGH);
+
+    // Initializes ADC for battery voltage monitoring
+    // code borrowed from ch32fun/examples/adc_polled/adc_polled.c:adc_init()
+    // ADCCLK = 24 MHz => RCC_ADCPRE = 0: divide by 2
+    RCC->CFGR0 &= ~(0x1F << 11);
+
+    // Enable GPIOD and ADC
+    RCC->APB2PCENR |= RCC_APB2Periph_GPIOD | RCC_APB2Periph_ADC1;
+
+    // PD4 is analog input chl 7
+    GPIOD->CFGLR &= ~(0xf << (4 * 4));   // CNF = 00: Analog, MODE = 00: Input
+
+    // Reset the ADC to init all regs
+    RCC->APB2PRSTR |= RCC_APB2Periph_ADC1;
+    RCC->APB2PRSTR &= ~RCC_APB2Periph_ADC1;
+
+    // Set up single conversion on chl 7
+    ADC1->RSQR1 = 0;
+    ADC1->RSQR2 = 0;
+    ADC1->RSQR3 = 7;   // 0-9 for 8 ext inputs and two internals
+
+    // set sampling time for chl 7
+    ADC1->SAMPTR2 &= ~(ADC_SMP0 << (3 * 7));
+    ADC1->SAMPTR2 |= 7 << (3 * 7);   // 0:7 => 3/9/15/30/43/57/73/241 cycles
+
+    // turn on ADC and set rule group to sw trig
+    ADC1->CTLR2 |= ADC_ADON | ADC_EXTSEL;
+
+    // Reset calibration
+    ADC1->CTLR2 |= ADC_RSTCAL;
+    while (ADC1->CTLR2 & ADC_RSTCAL)
+        ;
+
+    // Calibrate
+    ADC1->CTLR2 |= ADC_CAL;
+    while (ADC1->CTLR2 & ADC_CAL)
+        ;
+
+    // should be ready for SW conversion now
+}
+
+static void POWER_MANAGER_turnOff() {
+    funDigitalWrite(AUTOCUTOFF_GPIO, FUN_LOW);
+}
+
+static uint16_t POWER_MANAGER_ReadBatteryVoltage() {
+    // Code borrowed and adapted from
+    // ch32fun/examples/adc_polled/adc_polled.c:adc_get() start sw conversion
+
+    // (auto clears)
+    ADC1->CTLR2 |= ADC_SWSTART;
+
+    // wait for conversion complete
+    while (!(ADC1->STATR & ADC_EOC))
+        ;
+
+    // get result
+    // Voltage divider is returning half of the real voltage from the lipo
+    // ADC has 10bit resolution and the voltage reference is Vdd = 3.3V
+    float voltage = 3300.0 / 512 * ADC1->RDATAR;
+    return (uint16_t) voltage;
+}
+
+static void POWER_MANAGER_MonitorBattery() {
+    if (battery_monitor_clock >= BATTERY_MONITOR_PERIOD) {
+        battery_monitor_clock = 0;   // reset timer
+        battery_voltage =
+            POWER_MANAGER_ReadBatteryVoltage();   // read battery status
+        if (battery_voltage <= MIN_BATTERY_VOLTAGE) {
+            POWER_MANAGER_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2,
+                                            (HEIGHT - BATTERY_ICON_HEIGHT) / 2,
+                                            0);
+            global_clock = 0;
+            while (global_clock < LOW_BATTERY_ALERT_DURATION)
+                ;
+            POWER_MANAGER_turnOff();
+            while (1)
+                ;   // wait until the device is powered off
+        }
+    }
+}
+
+static void POWER_MANAGER_ShowBatteryStatus(uint8_t x, uint8_t y,
+                                            uint8_t progress) {
+    FB_Clear();
+    FB_DrawRectangle(x + 2, y + 0, 30, 16, false);
+    FB_DrawRectangle(x + 0, y + 4, 2, 8, true);
+
+    FB_DrawRectangle(x + 6, y + 4, progress * 22 / UINT8_MAX, 8, true);
+    SSD1306_Display(frame_buffer);
 }
 
 static void FB_Clear() {
