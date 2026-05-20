@@ -46,13 +46,13 @@
 
 #define DEBOUNCE_INTERVAL 50   // mS
 
-#define LEFT_BUTTON_BIT          0
-#define LEFT_BUTTON_GPIO         PC3
-#define IS_LEFT_BUTTON_PRESSED() (button_state & (1 << LEFT_BUTTON_BIT))
+#define JUMP_BUTTON_BIT          0
+#define JUMP_BUTTON_GPIO         PC3
+#define IS_JUMP_BUTTON_PRESSED() (button_state & (1 << JUMP_BUTTON_BIT))
 
-#define RIGHT_BUTTON_BIT          1
-#define RIGHT_BUTTON_GPIO         PC4
-#define IS_RIGHT_BUTTON_PRESSED() (button_state & (1 << RIGHT_BUTTON_BIT))
+#define DUCK_BUTTON_BIT          1
+#define DUCK_BUTTON_GPIO         PC4
+#define IS_DUCK_BUTTON_PRESSED() (button_state & (1 << DUCK_BUTTON_BIT))
 
 #define TIMEOUT_INTERVAL  1500    // mS
 #define STARTUP_INTERVAL  1000    // mS
@@ -226,8 +226,8 @@ int main() {
     // game
     global_clock = 0;
     while (button_state) {
-        if ((button_state & (1 << LEFT_BUTTON_BIT)) &&
-            (button_state & (1 << RIGHT_BUTTON_BIT))) {
+        if ((button_state & (1 << JUMP_BUTTON_BIT)) &&
+            (button_state & (1 << DUCK_BUTTON_BIT))) {
             if (global_clock >= HIGH_SCORE_RESET_TIME && high_score != 0) {
                 high_score = 0;
                 FLASH_Write_u32(FLASH_TARGET_ADDR, high_score);
@@ -240,7 +240,7 @@ int main() {
 
     // wait for button press to start the game
     while (1) {
-        if (!IS_LEFT_BUTTON_PRESSED()) {
+        if (!IS_JUMP_BUTTON_PRESSED()) {
             button_released = true;
         }
         if (button_state && button_released) {
@@ -257,11 +257,11 @@ int main() {
         BUTTONS_MonitorButtons();
         // GAME OVER
         if (trex_state == CRASHED) {
-            if (!IS_LEFT_BUTTON_PRESSED())
+            if (!IS_JUMP_BUTTON_PRESSED())
                 button_released = true;
 
             // wait for jump button to restart the game
-            if (IS_LEFT_BUTTON_PRESSED() && button_released) {
+            if (IS_JUMP_BUTTON_PRESSED() && button_released) {
                 button_released = false;
                 GAME_Init();
             } else {
@@ -422,34 +422,32 @@ static void FLASH_Write_u32(uint32_t address, uint32_t val) {
 }
 
 static void BUTTONS_Init() {
-    funPinMode(LEFT_BUTTON_GPIO, GPIO_CFGLR_IN_PUPD);
-    funDigitalWrite(LEFT_BUTTON_GPIO, FUN_HIGH);
-    funPinMode(RIGHT_BUTTON_GPIO, GPIO_CFGLR_IN_PUPD);
-    funDigitalWrite(RIGHT_BUTTON_GPIO, FUN_HIGH);
+    funPinMode(JUMP_BUTTON_GPIO, GPIO_CFGLR_IN_PUPD);
+    funDigitalWrite(JUMP_BUTTON_GPIO, FUN_HIGH);
+    funPinMode(DUCK_BUTTON_GPIO, GPIO_CFGLR_IN_PUPD);
+    funDigitalWrite(DUCK_BUTTON_GPIO, FUN_HIGH);
 }
-
-#define left_button_state()  (!funDigitalRead(LEFT_BUTTON_GPIO))
-#define right_button_state() (!funDigitalRead(RIGHT_BUTTON_GPIO))
 
 static void BUTTONS_MonitorButtons() {
     if (lb_debounce_clock >= DEBOUNCE_INTERVAL) {
         lb_debounce_clock = 0;
-        if (left_button_state())
-            button_state |= (1 << LEFT_BUTTON_BIT);
+        if (!funDigitalRead(JUMP_BUTTON_GPIO))
+            button_state |= (1 << JUMP_BUTTON_BIT);
         else
-            button_state &= ~(1 << LEFT_BUTTON_BIT);
-    } else if ((button_state & (1 << LEFT_BUTTON_BIT)) == left_button_state()) {
+            button_state &= ~(1 << JUMP_BUTTON_BIT);
+    } else if ((button_state & (1 << JUMP_BUTTON_BIT)) ==
+               !funDigitalRead(JUMP_BUTTON_GPIO)) {
         lb_debounce_clock = 0;
     }
 
     if (rb_debounce_clock >= DEBOUNCE_INTERVAL) {
         rb_debounce_clock = 0;
-        if (right_button_state())
-            button_state |= (1 << RIGHT_BUTTON_BIT);
+        if (!funDigitalRead(DUCK_BUTTON_GPIO))
+            button_state |= (1 << DUCK_BUTTON_BIT);
         else
-            button_state &= ~(1 << RIGHT_BUTTON_BIT);
-    } else if ((button_state & (1 << RIGHT_BUTTON_BIT)) ==
-               right_button_state()) {
+            button_state &= ~(1 << DUCK_BUTTON_BIT);
+    } else if ((button_state & (1 << DUCK_BUTTON_BIT)) ==
+               !funDigitalRead(DUCK_BUTTON_GPIO)) {
         rb_debounce_clock = 0;
     }
 }
@@ -582,10 +580,10 @@ static void GAME_ShowScore() {
 
 static void GAME_HandleState() {
     // update trex state based on button states
-    if (IS_LEFT_BUTTON_PRESSED()) {
+    if (IS_JUMP_BUTTON_PRESSED()) {
         trex_state = JUMPING;
     }
-    if (IS_RIGHT_BUTTON_PRESSED() && (trex_state != JUMPING)) {
+    if (IS_DUCK_BUTTON_PRESSED() && (trex_state != JUMPING)) {
         if (trex_state == RUNNING) {
             // preload a ducking sprite
             trex.sprite = trex_ducking1;
@@ -837,7 +835,7 @@ static void GAME_UpdateJumpingTrex() {
     // next state running
     if (jump_max_y_reached && trex.y > (HEIGHT - TREX_STANDING_HEIGHT - 2)) {
         trex.y = HEIGHT - TREX_STANDING_HEIGHT - 1;
-        if (button_state & (1 << RIGHT_BUTTON_BIT)) {
+        if (button_state & (1 << DUCK_BUTTON_BIT)) {
             trex_state = DUCKING;
             // preload ducking sprite
             trex.sprite = trex_ducking1;
