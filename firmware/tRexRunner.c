@@ -2,7 +2,10 @@
 // Includes
 //------------------------------------------------------------------------------
 
+#include <math.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -41,10 +44,17 @@
 #define SHOW_PTERODACTYL               120   // px
 
 #define INVERTED_MODE_THRESHOLD 1000   // points
+#define LEVEL_UP_POINTS         100
 
-#define HI_SCORE_Y 1
+#define HI_STR_X   (WIDTH - (DIGIT_WIDTH * 13))
+#define HI_STR_Y   1
+#define HI_SCORE_X (WIDTH - (DIGIT_WIDTH * 11))
+#define HI_SCORE_Y HI_STR_Y
+#define SCORE_X    (WIDTH - (DIGIT_WIDTH * 5) - 1)
+#define SCORE_Y    HI_STR_Y
 
-#define DEBOUNCE_INTERVAL 50   // mS
+#define DEBOUNCE_INTERVAL_MS  50
+#define OLED_STARTUP_DELAY_MS 100
 
 #define JUMP_BUTTON_BIT          0
 #define JUMP_BUTTON_GPIO         PC3
@@ -56,17 +66,23 @@
 
 #define AUTOCUTOFF_GPIO PD3
 
-#define TIMEOUT_INTERVAL  1500    // mS
-#define STARTUP_INTERVAL  1000    // mS
-#define INACTIVITY_PERIOD 30000   // mS
+#define TIMEOUT_INTERVAL_MS  1500
+#define STARTUP_INTERVAL_MS  1000
+#define INACTIVITY_PERIOD_MS 30000
 
-#define MIN_BATTERY_VOLTAGE        3600    // mV
-#define BATTERY_MONITOR_PERIOD     30000   // milliseconds
-#define LOW_BATTERY_ALERT_DURATION 1500    // mS
+#define MIN_BATTERY_VOLTAGE           3600   // mV
+#define BATTERY_MONITOR_PERIOD_MS     30000
+#define LOW_BATTERY_ALERT_DURATION_MS 1500
 
-#define HIGH_SCORE_RESET_TIME 10000   // mS
+#define HI_SCORE_RESET_TIME_MS 10000
+#define HI_SCORE_FLASH_ADDR    0x08003FC0
 
-#define FLASH_TARGET_ADDR 0x08003FC0
+#define PAGE_HEIGHT 8
+
+#define FLOOR(val) ((int) (val) - ((val) < (int) (val)))
+#define MAX_DIGIT_DIVISOR                                                      \
+    10000                 // Supports printing up to 5-digit numbers (0-99999)
+#define DECIMAL_BASE 10   // Base-10 numerical division step
 
 //------------------------------------------------------------------------------
 // Type definitions
@@ -117,17 +133,17 @@ static void POWER_MANAGER_turnOff();
 static void POWER_MANAGER_MonitorInactivity();
 static uint16_t POWER_MANAGER_ReadBatteryVoltage();
 static void POWER_MANAGER_MonitorBattery();
-static void POWER_MANAGER_ShowBatteryStatus(uint8_t x, uint8_t y,
+static void POWER_MANAGER_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
                                             uint8_t progress);
 
 static void FB_Clear();
-static uint8_t FB_DrawImage(int16_t x, int16_t y, const uint8_t* image,
+static uint8_t FB_DrawImage(int16_t pos_x, int16_t pos_y, const uint8_t* image,
                             uint8_t width, uint8_t height);
-static void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value);
+static void FB_DrawUnsignedValue(int16_t pos_x, int16_t pos_y, uint32_t value);
 static uint8_t FB_DrawGameObject(game_object_t game_object);
-static void FB_SetPixel(uint8_t x, uint8_t y);
+static void FB_SetPixel(uint8_t pos_x, uint8_t pos_y);
 static void FB_InvertColor();
-static void FB_DrawRectangle(uint8_t x, uint8_t y, uint8_t width,
+static void FB_DrawRectangle(uint8_t pos_x, uint8_t pos_y, uint8_t width,
                              uint8_t height, uint8_t fill);
 
 static void GAME_Init();
@@ -157,7 +173,7 @@ static void GAME_UpdateTrex();
 // Global variables
 //------------------------------------------------------------------------------
 
-static uint8_t frame_buffer[WIDTH * HEIGHT / 8];
+static uint8_t frame_buffer[WIDTH * HEIGHT / PAGE_HEIGHT];
 
 volatile uint16_t global_clock = 0;
 volatile uint8_t lb_debounce_clock = 0;
@@ -196,22 +212,6 @@ static const uint8_t pterodactyl_flying_heights[] = {
     PTERODACTYL_MAX_FLY_HEIGHT};
 
 //------------------------------------------------------------------------------
-// Inline functions
-//------------------------------------------------------------------------------
-
-static inline int my_floor(float x) {
-    int i = (int) x;
-
-    // If x is negative and has fractional part,
-    // subtract 1 because C truncates toward zero.
-    if (x < 0.0f && x != (float) i) {
-        i--;
-    }
-
-    return i;
-}
-
-//------------------------------------------------------------------------------
 // Main
 //------------------------------------------------------------------------------
 
@@ -223,7 +223,7 @@ int main() {
     TIMER_Init();
     POWER_MANAGER_init();
 
-    Delay_Ms(100);   // give OLED some more time
+    Delay_Ms(OLED_STARTUP_DELAY_MS);   // give OLED some more time
 
     SSD1306_Init();
 
@@ -238,21 +238,21 @@ int main() {
 
     global_clock = 0;   // reset timer
     while (1) {
-        if (global_clock >= TIMEOUT_INTERVAL) {
+        if (global_clock >= TIMEOUT_INTERVAL_MS) {
             POWER_MANAGER_turnOff();
-            while (1)
-                ;   // wait until the device is powered off
+            while (1) {
+            }   // wait until the device is powered off
         }
         BUTTONS_MonitorButtons();
         if (button_state == ((1 << JUMP_BUTTON_BIT) | (1 << DUCK_BUTTON_BIT))) {
             global_clock = 0;   // reset timer
-            while (global_clock < STARTUP_INTERVAL) {
+            while (global_clock < STARTUP_INTERVAL_MS) {
                 // Update progress bar
                 FB_Clear();
                 FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y,
                                  PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT,
                                  false);
-                uint16_t step = STARTUP_INTERVAL / 90;
+                uint16_t step = STARTUP_INTERVAL_MS / 90;
                 FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y,
                                  global_clock / step, PROGRESS_BAR_HEIGHT,
                                  true);
@@ -263,8 +263,8 @@ int main() {
                 if (button_state !=
                     ((1 << JUMP_BUTTON_BIT) | (1 << DUCK_BUTTON_BIT))) {
                     POWER_MANAGER_turnOff();
-                    while (1)
-                        ;   // wait until the device is powered off
+                    while (1) {
+                    }   // wait until the device is powered off
                 }
             }
             break;
@@ -280,9 +280,9 @@ int main() {
     while (button_state) {
         if ((button_state & (1 << JUMP_BUTTON_BIT)) &&
             (button_state & (1 << DUCK_BUTTON_BIT))) {
-            if (global_clock >= HIGH_SCORE_RESET_TIME && high_score != 0) {
+            if (global_clock >= HI_SCORE_RESET_TIME_MS && high_score != 0) {
                 high_score = 0;
-                FLASH_Write_u32(FLASH_TARGET_ADDR, high_score);
+                FLASH_Write_u32(HI_SCORE_FLASH_ADDR, high_score);
                 GAME_Init();
             }
         }
@@ -316,25 +316,28 @@ int main() {
         // POWER_MANAGER_MonitorBattery();ˆ
         // GAME OVER
         if (trex_state == CRASHED) {
-            if (!IS_JUMP_BUTTON_PRESSED())
+            if (!IS_JUMP_BUTTON_PRESSED()) {
                 button_released = true;
+            }
 
             // wait for jump button to restart the game
             if (IS_JUMP_BUTTON_PRESSED() && button_released) {
                 button_released = false;
                 GAME_Init();
             } else {
-                if (inverted_mode)
+                if (inverted_mode) {
                     FB_InvertColor();   // restore to original buffer
-                FB_DrawImage(WIDTH / 2 - GAME_OVER_SPLASH_WIDTH / 2, 10,
+                }
+                FB_DrawImage((WIDTH / 2) - (GAME_OVER_SPLASH_WIDTH / 2), 10,
                              game_over_splash, GAME_OVER_SPLASH_WIDTH,
                              GAME_OVER_SPLASH_HEIGHT);
-                if (inverted_mode)
+                if (inverted_mode) {
                     FB_InvertColor();   // invert back
+                }
                 if (score > high_score) {
                     SSD1306_Clear();
                     high_score = score;
-                    FLASH_Write_u32(FLASH_TARGET_ADDR, high_score);
+                    FLASH_Write_u32(HI_SCORE_FLASH_ADDR, high_score);
                 }
                 SSD1306_Display(frame_buffer);
                 continue;
@@ -366,15 +369,15 @@ int main() {
                         GAME_CreateCactus(&obstacles[latest_cactus]);
                         uint16_t random_distance =
                             obstacle_respawn_base_distance +
-                            rand() % obstacle_respawn_max_distance;
-                        obstacles[latest_cactus].x += random_distance;
+                            (rand() % obstacle_respawn_max_distance);
+                        obstacles[latest_cactus].x += (float) random_distance;
                         // respawn pterodatyl?
                         if (random_distance >= show_pterodactyl) {
                             // replace cactus with pterodactyl
                             obstacles[latest_cactus].visible = false;
                             GAME_CreatePterodactyl(
                                 &obstacles[CACTUS_MAX_COUNT]);
-                            obstacles[PTERODACTYL].x += random_distance;
+                            obstacles[PTERODACTYL].x += (float) random_distance;
                         }
                         latest_cactus++;
                     }
@@ -394,8 +397,9 @@ int main() {
             // update trex
             GAME_UpdateTrex();
             GAME_UpdateHorizon();
-            if (inverted_mode)
+            if (inverted_mode) {
                 FB_InvertColor();
+            }
             // RENDER
             SSD1306_Display(frame_buffer);
         }
@@ -473,8 +477,8 @@ static void FLASH_Write_u32(uint32_t address, uint32_t val) {
 
     printf("FLASH->CTLR = %08lx\n", FLASH->CTLR);
     if (FLASH->CTLR & 0x8080) {
-        while (1)
-            ;
+        while (1) {
+        }
     }
 
     uint32_t* ptr = (uint32_t*) address;
@@ -483,8 +487,8 @@ static void FLASH_Write_u32(uint32_t address, uint32_t val) {
     FLASH->CTLR = CR_PAGE_ER;
     FLASH->ADDR = (intptr_t) ptr;
     FLASH->CTLR = CR_STRT_Set | CR_PAGE_ER;
-    while (FLASH->STATR & FLASH_STATR_BSY)
-        ;   // Takes about 3ms.
+    while (FLASH->STATR & FLASH_STATR_BSY) {
+    }   // Takes about 3ms.
 
     // Clear buffer and prep for flashing.
     FLASH->CTLR = CR_PAGE_PG;   // synonym of FTPG.
@@ -493,19 +497,19 @@ static void FLASH_Write_u32(uint32_t address, uint32_t val) {
         ptr;   // This can actually happen about anywhere toward the end here.
 
     // Note: It takes about 6 clock cycles for this to finish.
-    while (FLASH->STATR & FLASH_STATR_BSY)
-        ;   // No real need for this.
+    while (FLASH->STATR & FLASH_STATR_BSY) {
+    }   // No real need for this.
 
     *ptr = val;                                       // Write to the memory
     FLASH->CTLR = CR_PAGE_PG | FLASH_CTLR_BUF_LOAD;   // Load the buffer.
-    while (FLASH->STATR & FLASH_STATR_BSY)
-        ;   // Only needed if running from RAM.
+    while (FLASH->STATR & FLASH_STATR_BSY) {
+    }   // Only needed if running from RAM.
 
     // Actually write the flash out. (Takes about 3ms)
     FLASH->CTLR = CR_PAGE_PG | CR_STRT_Set;
 
-    while (FLASH->STATR & FLASH_STATR_BSY)
-        ;
+    while (FLASH->STATR & FLASH_STATR_BSY) {
+    }
 
     // Lock Flash
     FLASH->CTLR |= FLASH_CTLR_LOCK;
@@ -519,23 +523,25 @@ static void BUTTONS_Init() {
 }
 
 static void BUTTONS_MonitorButtons() {
-    if (lb_debounce_clock >= DEBOUNCE_INTERVAL) {
+    if (lb_debounce_clock >= DEBOUNCE_INTERVAL_MS) {
         lb_debounce_clock = 0;
-        if (!funDigitalRead(JUMP_BUTTON_GPIO))
+        if (!funDigitalRead(JUMP_BUTTON_GPIO)) {
             button_state |= (1 << JUMP_BUTTON_BIT);
-        else
+        } else {
             button_state &= ~(1 << JUMP_BUTTON_BIT);
+        }
     } else if ((button_state & (1 << JUMP_BUTTON_BIT)) ==
                !funDigitalRead(JUMP_BUTTON_GPIO)) {
         lb_debounce_clock = 0;
     }
 
-    if (rb_debounce_clock >= DEBOUNCE_INTERVAL) {
+    if (rb_debounce_clock >= DEBOUNCE_INTERVAL_MS) {
         rb_debounce_clock = 0;
-        if (!funDigitalRead(DUCK_BUTTON_GPIO))
+        if (!funDigitalRead(DUCK_BUTTON_GPIO)) {
             button_state |= (1 << DUCK_BUTTON_BIT);
-        else
+        } else {
             button_state &= ~(1 << DUCK_BUTTON_BIT);
+        }
     } else if ((button_state & (1 << DUCK_BUTTON_BIT)) ==
                !funDigitalRead(DUCK_BUTTON_GPIO)) {
         rb_debounce_clock = 0;
@@ -576,19 +582,28 @@ static void POWER_MANAGER_init() {
 
     // Reset calibration
     ADC1->CTLR2 |= ADC_RSTCAL;
-    while (ADC1->CTLR2 & ADC_RSTCAL)
-        ;
+    while (ADC1->CTLR2 & ADC_RSTCAL) {
+    }
 
     // Calibrate
     ADC1->CTLR2 |= ADC_CAL;
-    while (ADC1->CTLR2 & ADC_CAL)
-        ;
+    while (ADC1->CTLR2 & ADC_CAL) {
+    }
 
     // should be ready for SW conversion now
 }
 
 static void POWER_MANAGER_turnOff() {
     funDigitalWrite(AUTOCUTOFF_GPIO, FUN_LOW);
+}
+
+void POWER_MANAGER_MonitorInactivity() {
+    if (button_state) {
+        inactivity_clock = 0;
+    }
+    if (inactivity_clock >= INACTIVITY_PERIOD_MS) {
+        POWER_MANAGER_turnOff();
+    }
 }
 
 static uint16_t POWER_MANAGER_ReadBatteryVoltage() {
@@ -599,8 +614,8 @@ static uint16_t POWER_MANAGER_ReadBatteryVoltage() {
     ADC1->CTLR2 |= ADC_SWSTART;
 
     // wait for conversion complete
-    while (!(ADC1->STATR & ADC_EOC))
-        ;
+    while (!(ADC1->STATR & ADC_EOC)) {
+    }
 
     // get result
     // Voltage divider is returning half of the real voltage from the lipo
@@ -610,7 +625,7 @@ static uint16_t POWER_MANAGER_ReadBatteryVoltage() {
 }
 
 static void POWER_MANAGER_MonitorBattery() {
-    if (battery_monitor_clock >= BATTERY_MONITOR_PERIOD) {
+    if (battery_monitor_clock >= BATTERY_MONITOR_PERIOD_MS) {
         battery_monitor_clock = 0;   // reset timer
         battery_voltage =
             POWER_MANAGER_ReadBatteryVoltage();   // read battery status
@@ -619,22 +634,22 @@ static void POWER_MANAGER_MonitorBattery() {
                                             (HEIGHT - BATTERY_ICON_HEIGHT) / 2,
                                             0);
             global_clock = 0;
-            while (global_clock < LOW_BATTERY_ALERT_DURATION)
-                ;
+            while (global_clock < LOW_BATTERY_ALERT_DURATION_MS) {
+            }
             POWER_MANAGER_turnOff();
-            while (1)
-                ;   // wait until the device is powered off
+            while (1) {
+            }   // wait until the device is powered off
         }
     }
 }
 
-static void POWER_MANAGER_ShowBatteryStatus(uint8_t x, uint8_t y,
+static void POWER_MANAGER_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
                                             uint8_t progress) {
     FB_Clear();
-    FB_DrawRectangle(x + 2, y + 0, 30, 16, false);
-    FB_DrawRectangle(x + 0, y + 4, 2, 8, true);
+    FB_DrawRectangle(pos_x + 2, pos_y + 0, 30, 16, false);
+    FB_DrawRectangle(pos_x + 0, pos_y + 4, 2, 8, true);
 
-    FB_DrawRectangle(x + 6, y + 4, progress * 22 / UINT8_MAX, 8, true);
+    FB_DrawRectangle(pos_x + 6, pos_y + 4, progress * 22 / UINT8_MAX, 8, true);
     SSD1306_Display(frame_buffer);
 }
 
@@ -642,85 +657,98 @@ static void FB_Clear() {
     memset(frame_buffer, 0, sizeof(uint8_t) * (WIDTH * HEIGHT / 8));
 }
 
-static uint8_t FB_DrawImage(int16_t x, int16_t y, const uint8_t* image,
+static uint8_t FB_DrawImage(int16_t pos_x, int16_t pos_y, const uint8_t* image,
                             uint8_t width, uint8_t height) {
     uint8_t collision = false;
-    for (int16_t h = y; h < (y + height); h++) {
-        for (int16_t w = x; w < (x + width); w++) {
-            if ((w >= WIDTH) || (h >= HEIGHT))
+    for (int16_t iter_y = pos_y; iter_y < (pos_y + height); iter_y++) {
+        for (int16_t iter_x = pos_x; iter_x < (pos_x + width); iter_x++) {
+            if ((iter_x >= WIDTH) || (iter_y >= HEIGHT)) {
                 continue;
-            if (h < 0 || w < 0)
+            }
+            if (iter_y < 0 || iter_x < 0) {
                 continue;
-            uint16_t buffer_index = WIDTH * (h / 8) + w;
-            uint8_t image_w = w - x;
-            uint8_t image_h = h - y;
-            uint16_t image_index = width * (image_h / 8) + image_w;
-            if ((image[image_index] >> (image_h % 8) & 0x01) == 0x01) {
-                if (frame_buffer[buffer_index] >> (h % 8) & 0x01)
+            }
+            uint16_t buffer_index = (WIDTH * (iter_y / PAGE_HEIGHT)) + iter_x;
+            uint8_t image_w = iter_x - pos_x;
+            uint8_t image_h = iter_y - pos_y;
+            uint16_t image_index = (width * (image_h / PAGE_HEIGHT)) + image_w;
+            if ((image[image_index] >> (image_h % PAGE_HEIGHT) & 0x01) ==
+                0x01) {
+                if (frame_buffer[buffer_index] >> (iter_y % PAGE_HEIGHT) &
+                    0x01) {
                     collision = true;
-                frame_buffer[buffer_index] |= (1 << (h % 8));
+                }
+                frame_buffer[buffer_index] |= (1 << (iter_y % PAGE_HEIGHT));
             }
         }
     }
     return collision;
 }
 
-static void FB_DrawUnsignedValue(int16_t x, int16_t y, uint32_t value) {
-    int16_t xx = x;
-    for (uint32_t dividend = 10000; dividend > 0; dividend /= 10) {
-        FB_DrawImage(xx, y, &digits[(value / dividend % 10) * DIGIT_WIDTH],
-                     DIGIT_WIDTH, DIGIT_HEIGHT);
-        xx += DIGIT_WIDTH;
+static void FB_DrawUnsignedValue(int16_t pos_x, int16_t pos_y, uint32_t value) {
+    int16_t temp_x_pos = pos_x;
+    for (uint32_t dividend = MAX_DIGIT_DIVISOR; dividend > 0;
+         dividend /= DECIMAL_BASE) {
+        FB_DrawImage(
+            temp_x_pos, pos_y,
+            &digits[(size_t) ((value / dividend % DECIMAL_BASE) * DIGIT_WIDTH)],
+            DIGIT_WIDTH, DIGIT_HEIGHT);
+        temp_x_pos += DIGIT_WIDTH;
     }
 }
 
 static uint8_t FB_DrawGameObject(game_object_t game_object) {
-    if (!game_object.visible)
+    if (!game_object.visible) {
         return false;
-    return FB_DrawImage(my_floor(game_object.x), my_floor(game_object.y),
+    }
+    return FB_DrawImage(FLOOR(game_object.x), FLOOR(game_object.y),
                         game_object.sprite, game_object.width,
                         game_object.height);
 }
 
-static void FB_SetPixel(uint8_t x, uint8_t y) {
-    if (x >= WIDTH || y >= HEIGHT)
+static void FB_SetPixel(uint8_t pos_x, uint8_t pos_y) {
+    if (pos_x >= WIDTH || pos_y >= HEIGHT) {
         return;
+    }
 
-    uint32_t index = WIDTH * (y / 8) + x;
-    frame_buffer[index] |= (1 << (y & 7));
+    uint32_t index = (WIDTH * (pos_y / PAGE_HEIGHT)) + pos_x;
+    frame_buffer[index] |= (1 << (pos_y & (PAGE_HEIGHT - 1)));
 }
 
 static void FB_InvertColor() {
-    for (uint16_t i = 0; i < (WIDTH * HEIGHT / 8); i++) {
+    for (size_t i = 0; i < (WIDTH * HEIGHT / PAGE_HEIGHT); i++) {
         frame_buffer[i] = ~frame_buffer[i];
     }
 }
 
-static void FB_DrawRectangle(uint8_t x, uint8_t y, uint8_t width,
+static void FB_DrawRectangle(uint8_t pos_x, uint8_t pos_y, uint8_t width,
                              uint8_t height, uint8_t fill) {
-    if ((x >= WIDTH) || (y >= HEIGHT))
+    if ((pos_x >= WIDTH) || (pos_y >= HEIGHT)) {
         return;
-
-    uint8_t a, b;
-
-    if ((y + height) > HEIGHT) {
-        a = HEIGHT;
-    } else {
-        a = y + height;
     }
 
-    if ((x + width) > WIDTH) {
-        b = WIDTH;
+    uint8_t max_x;
+    uint8_t max_y;
+
+    if ((pos_y + height) > HEIGHT) {
+        max_y = HEIGHT;
     } else {
-        b = x + width;
+        max_y = pos_y + height;
     }
 
-    for (uint8_t i = y; i < a; i++) {
-        for (uint8_t j = x; j < b; j++) {
+    if ((pos_x + width) > WIDTH) {
+        max_x = WIDTH;
+    } else {
+        max_x = pos_x + width;
+    }
+
+    for (uint8_t i = pos_y; i < max_y; i++) {
+        for (uint8_t j = pos_x; j < max_x; j++) {
             if (fill) {
                 FB_SetPixel(j, i);
             } else {
-                if (i == y || i == (a - 1) || j == x || j == (b - 1)) {
+                if (i == pos_y || i == (max_y - 1) || j == pos_x ||
+                    j == (max_x - 1)) {
                     FB_SetPixel(j, i);
                 }
             }
@@ -730,7 +758,7 @@ static void FB_DrawRectangle(uint8_t x, uint8_t y, uint8_t width,
 
 static void GAME_Init() {
     score = 0;
-    high_score = FLASH_Read_u32(FLASH_TARGET_ADDR);
+    high_score = FLASH_Read_u32(HI_SCORE_FLASH_ADDR);
     game_speed = GAME_INITIAL_SPEED;
     trex_state = RUNNING;
     latest_cactus = 0;   // index of the newest cactus in the array
@@ -744,8 +772,9 @@ static void GAME_Init() {
 
     GAME_InitHorizon();
     GAME_InitTrex();
-    for (uint8_t i = 0; i < CACTUS_MAX_COUNT; i++)
+    for (uint8_t i = 0; i < CACTUS_MAX_COUNT; i++) {
         GAME_InitCactus(&obstacles[i]);
+    }
     GAME_InitPrerodactyl(&obstacles[PTERODACTYL]);
 
     FB_Clear();
@@ -758,10 +787,10 @@ static void GAME_Init() {
 }
 
 static void GAME_ShowScore() {
-    FB_DrawImage(WIDTH - DIGIT_WIDTH * 13, HI_SCORE_Y, hi_score_str,
-                 HI_SCORE_STR_WIDTH, HI_SCORE_STR_HEIGHT);
-    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 11, HI_SCORE_Y, high_score);
-    FB_DrawUnsignedValue(WIDTH - DIGIT_WIDTH * 5 - 1, HI_SCORE_Y, score);
+    FB_DrawImage(HI_STR_X, HI_STR_X, hi_score_str, HI_SCORE_STR_WIDTH,
+                 HI_SCORE_STR_HEIGHT);
+    FB_DrawUnsignedValue(HI_SCORE_X, HI_SCORE_Y, high_score);
+    FB_DrawUnsignedValue(SCORE_X, SCORE_Y, score);
 }
 
 static void GAME_HandleState() {
@@ -785,7 +814,7 @@ static void GAME_HandleState() {
 }
 
 static void GAME_AdjustDifficulty() {
-    if ((score % 100) == 0) {
+    if ((score % LEVEL_UP_POINTS) == 0) {
         game_speed += GAME_SPEED_DELTA;
         // increase the distance between obstacles a little bit
         obstacle_respawn_base_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
@@ -809,35 +838,37 @@ static void GAME_UpdateHorizon() {
     for (uint8_t i = horizon.x; i < horizon.width; i++) {
         // create some space between trex and horizon
         if (trex_state == RUNNING &&
-            (i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
-            (i < trex.x + TREX_STANDING_CLEARENCE_MAX))
+            ((float) i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
+            ((float) i < trex.x + TREX_STANDING_CLEARENCE_MAX)) {
             continue;
+        }
         if (trex_state == RUNNING &&
-            (i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
-            (i < trex.x + TREX_STANDING_CLEARENCE_MAX))
+            ((float) i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
+            ((float) i < trex.x + TREX_STANDING_CLEARENCE_MAX)) {
             continue;
+        }
         if (trex_state == JUMPING &&
-            (i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
-            (i < trex.x + TREX_STANDING_CLEARENCE_MAX) &&
-            (trex.y > trex.height + 1))
+            ((float) i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
+            ((float) i < trex.x + TREX_STANDING_CLEARENCE_MAX) &&
+            (trex.y > (float) trex.height + 1)) {
             continue;
+        }
         if (trex_state == DUCKING &&
-            (i >= trex.x + TREX_DUCKING_CLEARENCE_MIN) &&
-            (i < trex.x + TREX_DUCKING_CLEARENCE_MAX))
+            ((float) i >= trex.x + TREX_DUCKING_CLEARENCE_MIN) &&
+            ((float) i < trex.x + TREX_DUCKING_CLEARENCE_MAX)) {
             continue;
+        }
 
-        int8_t bump1_xx = my_floor(horizon.bump1_x);
-        int8_t bump2_xx = my_floor(horizon.bump2_x);
+        int8_t bump1_xx = FLOOR(horizon.bump1_x);
+        int8_t bump2_xx = FLOOR(horizon.bump2_x);
 
-        if (i >= bump1_xx && i < bump1_xx + horizon.bump1_width)
-            // draw first bump
+        if ((i >= bump1_xx && i < bump1_xx + horizon.bump1_width) ||
+            (i >= bump2_xx &&
+             i < bump2_xx + horizon.bump2_width)) {   // draw bumps
             FB_SetPixel(i, horizon.y);
-        else if (i >= bump2_xx && i < bump2_xx + horizon.bump2_width)
-            // draw second bump
-            FB_SetPixel(i, horizon.y);
-        else
-            // draw horizon line
+        } else {   // draw horizon line
             FB_SetPixel(i, horizon.y + 1);
+        }
     }
 
     // move bumps
@@ -876,8 +907,9 @@ static void GAME_CreatePterodactyl(game_object_t* pterodactyl) {
 static void GAME_UpdatePterodactyl(game_object_t* pterodactyl) {
     static unsigned int flapping_counter = 0;
 
-    if (!pterodactyl->visible)
+    if (!pterodactyl->visible) {
         return;
+    }
 
     if (++flapping_counter >= PTERODACTYL_WING_SWAP) {
         flapping_counter = 0;
@@ -891,7 +923,7 @@ static void GAME_UpdatePterodactyl(game_object_t* pterodactyl) {
     FB_DrawGameObject(*pterodactyl);
 
     // move to the left in small steps
-    if (pterodactyl->x + pterodactyl->width > 0) {
+    if (pterodactyl->x + (float) pterodactyl->width > 0) {
         pterodactyl->x -= game_speed;
     } else {
         pterodactyl->visible = false;
@@ -931,17 +963,18 @@ static void GAME_CreateCactus(game_object_t* cactus) {
         break;
     }
 
-    cactus->y -= cactus->height;
+    cactus->y -= (float) cactus->height;
 }
 
 static void GAME_UpdateCactus(game_object_t* cactus) {
-    if (!cactus->visible)
+    if (!cactus->visible) {
         return;
+    }
 
     FB_DrawGameObject(*cactus);
 
     // move to the left in small steps
-    if (cactus->x + cactus->width > 0) {
+    if (cactus->x + (float) cactus->width > 0) {
         cactus->x -= game_speed;
     } else {
         cactus->visible = false;
@@ -951,8 +984,9 @@ static void GAME_UpdateCactus(game_object_t* cactus) {
 static uint8_t GAME_CountVisibleCacti(game_object_t cactus[]) {
     uint8_t cactuses_on_screen = 0;
     for (uint8_t i = 0; i < CACTUS_MAX_COUNT; i++) {
-        if (cactus[i].visible)
+        if (cactus[i].visible) {
             cactuses_on_screen++;
+        }
     }
     return cactuses_on_screen;
 }
@@ -1010,9 +1044,9 @@ static void GAME_UpdateJumpingTrex() {
     // jump up
     if (!jump_max_y_reached && trex.y >= (HEIGHT - TREX_MAX_JUMP_HEIGHT)) {
         trex.y -= JUMPING_SPEED;
-    } else
+    } else {
         jump_max_y_reached = 1;
-
+    }
     // let gravity do the landing
     if (jump_max_y_reached && trex.y <= (HEIGHT - TREX_STANDING_HEIGHT - 2)) {
         trex.y += GAME_GRAVITY;
