@@ -230,6 +230,47 @@ int main() {
     bool button_released = false;   // used to prevent immediate restart of the
                                     // game while holding the jumping button
 
+    // startup, turning on the device
+    FB_Clear();
+    FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH,
+                     PROGRESS_BAR_HEIGHT, false);
+    SSD1306_Display(frame_buffer);
+
+    global_clock = 0;   // reset timer
+    while (1) {
+        if (global_clock >= TIMEOUT_INTERVAL) {
+            POWER_MANAGER_turnOff();
+            while (1)
+                ;   // wait until the device is powered off
+        }
+        BUTTONS_MonitorButtons();
+        if (button_state == ((1 << JUMP_BUTTON_BIT) | (1 << DUCK_BUTTON_BIT))) {
+            global_clock = 0;   // reset timer
+            while (global_clock < STARTUP_INTERVAL) {
+                // Update progress bar
+                FB_Clear();
+                FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y,
+                                 PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT,
+                                 false);
+                uint16_t step = STARTUP_INTERVAL / 90;
+                FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y,
+                                 global_clock / step, PROGRESS_BAR_HEIGHT,
+                                 true);
+                SSD1306_Display(frame_buffer);
+                BUTTONS_MonitorButtons();
+                // check if the buttons are released in the meantime, if yes
+                // turn off the device
+                if (button_state !=
+                    ((1 << JUMP_BUTTON_BIT) | (1 << DUCK_BUTTON_BIT))) {
+                    POWER_MANAGER_turnOff();
+                    while (1)
+                        ;   // wait until the device is powered off
+                }
+            }
+            break;
+        }
+    }
+
     // initialize the game
     GAME_Init();
 
@@ -246,6 +287,7 @@ int main() {
             }
         }
         BUTTONS_MonitorButtons();
+        // TODO uncomment this once the PCB is finished
         // POWER_MANAGER_MonitorBattery();
     }
 
@@ -259,6 +301,9 @@ int main() {
             break;
         }
         BUTTONS_MonitorButtons();
+        POWER_MANAGER_MonitorInactivity();
+        // TODO uncomment this once the PCB is finished
+        // POWER_MANAGER_MonitorBattery();
     }
 
     // Seed the Random Number Generator.
@@ -266,6 +311,9 @@ int main() {
 
     while (1) {
         BUTTONS_MonitorButtons();
+        POWER_MANAGER_MonitorInactivity();
+        // TODO uncomment this once the PCB is finished
+        // POWER_MANAGER_MonitorBattery();ˆ
         // GAME OVER
         if (trex_state == CRASHED) {
             if (!IS_JUMP_BUTTON_PRESSED())
