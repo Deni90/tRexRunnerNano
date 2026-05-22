@@ -2,7 +2,6 @@
 // Includes
 //------------------------------------------------------------------------------
 
-#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -53,6 +52,9 @@
 #define SCORE_X    (WIDTH - (DIGIT_WIDTH * 5) - 1)
 #define SCORE_Y    HI_STR_Y
 
+#define GAME_OVER_X ((WIDTH / 2) - (GAME_OVER_SPLASH_WIDTH / 2))
+#define GAME_OVER_Y 10
+
 #define DEBOUNCE_INTERVAL_MS  50
 #define OLED_STARTUP_DELAY_MS 100
 
@@ -66,16 +68,17 @@
 
 #define AUTOCUTOFF_GPIO PD3
 
-#define TIMEOUT_INTERVAL_MS  1500
-#define STARTUP_INTERVAL_MS  1000
+#define BOOT_WINDOW_MS      1500
+#define STARTUP_INTERVAL_MS 1000
+#define FACTORY_TRIGGER_MS  5000
+
 #define INACTIVITY_PERIOD_MS 30000
 
 #define MIN_BATTERY_VOLTAGE           3600   // mV
 #define BATTERY_MONITOR_PERIOD_MS     30000
 #define LOW_BATTERY_ALERT_DURATION_MS 1500
 
-#define HI_SCORE_RESET_TIME_MS 10000
-#define HI_SCORE_FLASH_ADDR    0x08003FC0
+#define HI_SCORE_FLASH_ADDR 0x08003FC0
 
 #define PAGE_HEIGHT 8
 
@@ -87,6 +90,15 @@
 //------------------------------------------------------------------------------
 // Type definitions
 //------------------------------------------------------------------------------
+
+typedef enum system_state_e {
+    SYS_STARTUP,
+    SYS_FACTORY_RESET,
+    SYS_WAIT_GAME_START,
+    SYS_RUNNING_GAME,
+    SYS_GAME_OVER,
+    SYS_SHUTDOWN
+} system_state_t;
 
 typedef enum trex_states_e {
     RUNNING = 0,
@@ -123,16 +135,14 @@ void TIM1_UP_IRQHandler(void) __attribute__((interrupt));
 static void TIMER_Init();
 
 static void BUTTONS_Init();
-static void BUTTONS_MonitorButtons();
+static void BUTTONS_MonitorButtons(uint32_t now_ms);
 
 static uint32_t FLASH_Read_u32(uint32_t address);
 static void FLASH_Write_u32(uint32_t address, uint32_t val);
 
 static void POWER_MANAGER_init();
 static void POWER_MANAGER_turnOff();
-static void POWER_MANAGER_MonitorInactivity();
 static uint16_t POWER_MANAGER_ReadBatteryVoltage();
-static void POWER_MANAGER_MonitorBattery();
 static void POWER_MANAGER_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
                                             uint8_t progress);
 
@@ -145,10 +155,19 @@ static void FB_SetPixel(uint8_t pos_x, uint8_t pos_y);
 static void FB_InvertColor();
 static void FB_DrawRectangle(uint8_t pos_x, uint8_t pos_y, uint8_t width,
                              uint8_t height, uint8_t fill);
+static void FB_DrawProgressBar(uint32_t current_ms, uint32_t target_ms);
+
+static void SYS_HardwareSetup();
+static system_state_t SYS_ProcessStartup(uint32_t now_ms);
+static system_state_t SYS_ProcessFactoryReset(uint32_t now_ms);
+static system_state_t SYS_ProcessGame(uint32_t now_ms);
+static system_state_t SYS_ProcessGameOver();
+static system_state_t SYS_MonitorInactivity(uint32_t now_ms);
+static system_state_t SYS_MonitorBattery(uint32_t now_ms);
 
 static void GAME_Init();
 static void GAME_ShowScore();
-static void GAME_HandleState();
+static void GAME_HandleTrexState();
 static void GAME_AdjustDifficulty();
 
 static void GAME_InitHorizon();
@@ -173,39 +192,25 @@ static void GAME_UpdateTrex();
 // Global variables
 //------------------------------------------------------------------------------
 
+volatile uint32_t system_millis = 0;
 static uint8_t frame_buffer[WIDTH * HEIGHT / PAGE_HEIGHT];
-
-volatile uint16_t global_clock = 0;
-volatile uint8_t lb_debounce_clock = 0;
-volatile uint8_t rb_debounce_clock = 0;
-volatile uint16_t game_speed_update_clock = 0;
-volatile uint16_t inactivity_clock = 0;
-volatile uint16_t battery_monitor_clock = 0;
-
+static system_state_t current_state = SYS_STARTUP;
 static float game_speed = GAME_INITIAL_SPEED;
 static uint32_t high_score = 0;
 static uint32_t score = 0;
-
 static uint8_t button_state = 0x00;
 static trex_states_t trex_state = RUNNING;
-
 static horizon_t horizon;
 static game_object_t trex;
 static game_object_t
     obstacles[CACTUS_MAX_COUNT + 1];   // last element is pterodactyl
-
 static uint8_t latest_cactus = 0;   // index of the newest cactus in the array
-
 static uint16_t obstacle_respawn_base_distance = OBSTACLE_RESPAWN_BASE_DISTANCE;
 // make sure WIDTH > OBSTACLE_RESPAWN_BASE_DISTANCE
 static uint16_t obstacle_respawn_max_distance =
     WIDTH - OBSTACLE_RESPAWN_BASE_DISTANCE;
 static uint16_t show_pterodactyl = SHOW_PTERODACTYL;
-
 static uint8_t inverted_mode = false;
-
-static uint16_t battery_voltage = 0;
-
 // lookup table for pterodactyl flying heights
 static const uint8_t pterodactyl_flying_heights[] = {
     PTERODACTYL_MIN_FLY_HEIGHT, PTERODACTYL_MID_FLY_HEIGHT,
@@ -216,204 +221,63 @@ static const uint8_t pterodactyl_flying_heights[] = {
 //------------------------------------------------------------------------------
 
 int main() {
-    SystemInit();
-    funGpioInitAll();   // Enable GPIOs
+    SYS_HardwareSetup();
 
-    BUTTONS_Init();
-    TIMER_Init();
-    POWER_MANAGER_init();
+    uint32_t last_render_time = 0;
+    bool is_render_time = false;
+    bool was_any_button_pressed = true;
 
-    Delay_Ms(OLED_STARTUP_DELAY_MS);   // give OLED some more time
-
-    SSD1306_Init();
-
-    bool button_released = false;   // used to prevent immediate restart of the
-                                    // game while holding the jumping button
-
-    // startup, turning on the device
-    FB_Clear();
-    FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH,
-                     PROGRESS_BAR_HEIGHT, false);
-    SSD1306_Display(frame_buffer);
-
-    global_clock = 0;   // reset timer
     while (1) {
-        if (global_clock >= TIMEOUT_INTERVAL_MS) {
-            POWER_MANAGER_turnOff();
-            while (1) {
-            }   // wait until the device is powered off
+        uint32_t current_time = system_millis;
+
+        if ((current_time - last_render_time) >= RENDER_PERIOD) {
+            last_render_time = current_time;
+            is_render_time = true;
         }
-        BUTTONS_MonitorButtons();
-        if (button_state == ((1 << JUMP_BUTTON_BIT) | (1 << DUCK_BUTTON_BIT))) {
-            global_clock = 0;   // reset timer
-            while (global_clock < STARTUP_INTERVAL_MS) {
-                // Update progress bar
-                FB_Clear();
-                FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y,
-                                 PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT,
-                                 false);
-                uint16_t step = STARTUP_INTERVAL_MS / 90;
-                FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y,
-                                 global_clock / step, PROGRESS_BAR_HEIGHT,
-                                 true);
-                SSD1306_Display(frame_buffer);
-                BUTTONS_MonitorButtons();
-                // check if the buttons are released in the meantime, if yes
-                // turn off the device
-                if (button_state !=
-                    ((1 << JUMP_BUTTON_BIT) | (1 << DUCK_BUTTON_BIT))) {
-                    POWER_MANAGER_turnOff();
-                    while (1) {
-                    }   // wait until the device is powered off
-                }
+
+        switch (current_state) {
+        case SYS_STARTUP:
+            current_state = SYS_ProcessStartup(current_time);
+            break;
+        case SYS_FACTORY_RESET:
+            current_state = SYS_ProcessFactoryReset(current_time);
+            break;
+        case SYS_WAIT_GAME_START:
+            // Handle button presses only on the rising edge.
+            // This prevents accidental game starts if a button remains
+            // pressed after startup or after a game over.
+            bool is_any_button_pressed =
+                (IS_JUMP_BUTTON_PRESSED() || IS_DUCK_BUTTON_PRESSED()) != 0;
+            bool is_button_just_pressed =
+                (is_any_button_pressed && !was_any_button_pressed) != 0;
+            was_any_button_pressed = is_any_button_pressed;
+            if (is_button_just_pressed) {
+                GAME_Init();
+                current_state = SYS_RUNNING_GAME;
             }
             break;
-        }
-    }
-
-    // initialize the game
-    GAME_Init();
-
-    // wait until the buttons are released to prevent automatic start of the
-    // game
-    global_clock = 0;
-    while (button_state) {
-        if ((button_state & (1 << JUMP_BUTTON_BIT)) &&
-            (button_state & (1 << DUCK_BUTTON_BIT))) {
-            if (global_clock >= HI_SCORE_RESET_TIME_MS && high_score != 0) {
-                high_score = 0;
-                FLASH_Write_u32(HI_SCORE_FLASH_ADDR, high_score);
-                GAME_Init();
+        case SYS_RUNNING_GAME:
+            if (is_render_time) {
+                current_state = SYS_ProcessGame(current_time);
             }
-        }
-        BUTTONS_MonitorButtons();
-        // TODO uncomment this once the PCB is finished
-        // POWER_MANAGER_MonitorBattery();
-    }
-
-    // wait for button press to start the game
-    while (1) {
-        if (!IS_JUMP_BUTTON_PRESSED()) {
-            button_released = true;
-        }
-        if (button_state && button_released) {
-            button_released = false;
             break;
-        }
-        BUTTONS_MonitorButtons();
-        POWER_MANAGER_MonitorInactivity();
-        // TODO uncomment this once the PCB is finished
-        // POWER_MANAGER_MonitorBattery();
-    }
-
-    // Seed the Random Number Generator.
-    seed(global_clock);   // initialize PRNG
-
-    while (1) {
-        BUTTONS_MonitorButtons();
-        POWER_MANAGER_MonitorInactivity();
-        // TODO uncomment this once the PCB is finished
-        // POWER_MANAGER_MonitorBattery();ˆ
-        // GAME OVER
-        if (trex_state == CRASHED) {
-            if (!IS_JUMP_BUTTON_PRESSED()) {
-                button_released = true;
-            }
-
-            // wait for jump button to restart the game
-            if (IS_JUMP_BUTTON_PRESSED() && button_released) {
-                button_released = false;
-                GAME_Init();
-            } else {
-                if (inverted_mode) {
-                    FB_InvertColor();   // restore to original buffer
-                }
-                FB_DrawImage((WIDTH / 2) - (GAME_OVER_SPLASH_WIDTH / 2), 10,
-                             game_over_splash, GAME_OVER_SPLASH_WIDTH,
-                             GAME_OVER_SPLASH_HEIGHT);
-                if (inverted_mode) {
-                    FB_InvertColor();   // invert back
-                }
-                if (score > high_score) {
-                    SSD1306_Clear();
-                    high_score = score;
-                    FLASH_Write_u32(HI_SCORE_FLASH_ADDR, high_score);
-                }
-                SSD1306_Display(frame_buffer);
-                continue;
-            }
-        }
-
-        GAME_HandleState();
-
-        if (global_clock >= RENDER_PERIOD) {
-            global_clock = 0;
-
+        case SYS_GAME_OVER:
+            current_state = SYS_ProcessGameOver();
+            break;
+        case SYS_SHUTDOWN:
             FB_Clear();
-
-            GAME_ShowScore();
-
-            // create new obstacles
-            if (GAME_CountVisibleCacti(obstacles) < CACTUS_MAX_COUNT) {
-                uint8_t previous_cactus;
-                if (latest_cactus > 0) {
-                    previous_cactus = latest_cactus - 1;
-                } else {
-                    previous_cactus = CACTUS_MAX_COUNT - 1;
-                }
-                if (obstacles[latest_cactus].visible == false &&
-                    !obstacles[PTERODACTYL].visible) {
-                    if ((int) obstacles[previous_cactus].x <=
-                            (WIDTH - obstacles[previous_cactus].width) ||
-                        !obstacles[previous_cactus].visible) {
-                        GAME_CreateCactus(&obstacles[latest_cactus]);
-                        uint16_t random_distance =
-                            obstacle_respawn_base_distance +
-                            (rand() % obstacle_respawn_max_distance);
-                        obstacles[latest_cactus].x += (float) random_distance;
-                        // respawn pterodatyl?
-                        if (random_distance >= show_pterodactyl) {
-                            // replace cactus with pterodactyl
-                            obstacles[latest_cactus].visible = false;
-                            GAME_CreatePterodactyl(
-                                &obstacles[CACTUS_MAX_COUNT]);
-                            obstacles[PTERODACTYL].x += (float) random_distance;
-                        }
-                        latest_cactus++;
-                    }
-                }
-                if (latest_cactus == CACTUS_MAX_COUNT) {
-                    latest_cactus = 0;
-                }
-            }
-
-            // update cacti
-            for (uint8_t i = 0; i < CACTUS_MAX_COUNT; i++) {
-                GAME_UpdateCactus(&obstacles[i]);
-            }
-            // update pterodactyl
-            GAME_UpdatePterodactyl(&obstacles[PTERODACTYL]);
-
-            // update trex
-            GAME_UpdateTrex();
-            GAME_UpdateHorizon();
-            if (inverted_mode) {
-                FB_InvertColor();
-            }
-            // RENDER
+            POWER_MANAGER_turnOff();
+            break;
+        }
+        // Render the prepared scene
+        if (is_render_time) {
+            is_render_time = false;
             SSD1306_Display(frame_buffer);
         }
-
-        // speed up the game periodically
-        if (game_speed_update_clock >= GAME_SCORE_INCREMENT) {
-            game_speed_update_clock = 0;
-            score++;
-            GAME_AdjustDifficulty();
-
-            if ((score % INVERTED_MODE_THRESHOLD) == 0) {
-                inverted_mode = !inverted_mode;
-            }
-        }
+        // Periodical checks
+        BUTTONS_MonitorButtons(current_time);
+        current_state = SYS_MonitorInactivity(current_time);
+        // current_state = SYS_MonitorBattery(current_time);
     }
 
     return 0;
@@ -422,6 +286,197 @@ int main() {
 //------------------------------------------------------------------------------
 // Function definitions
 //------------------------------------------------------------------------------
+
+static void SYS_HardwareSetup() {
+    SystemInit();
+    funGpioInitAll();   // Enable GPIOs
+    BUTTONS_Init();
+    TIMER_Init();
+    POWER_MANAGER_init();
+    // give OLED some more time
+    Delay_Ms(OLED_STARTUP_DELAY_MS);
+    SSD1306_Init();
+}
+
+static system_state_t SYS_ProcessStartup(uint32_t now_ms) {
+    static uint32_t boot_window_ms = 0;
+    static uint32_t hold_ms = 0;
+    system_state_t next_state = SYS_STARTUP;
+    // Initialize boot window timestamp on the very first frame
+    if (boot_window_ms == 0) {
+        boot_window_ms = now_ms;
+    }
+    uint32_t progress = 0;
+    if (IS_JUMP_BUTTON_PRESSED() && IS_DUCK_BUTTON_PRESSED()) {
+        // Start holding if we weren't already holding
+        if (hold_ms == 0) {
+            hold_ms = now_ms;
+        }
+        // Reset boot window start time while buttons are actively held
+        boot_window_ms = now_ms;
+        progress = now_ms - hold_ms;
+        FB_DrawProgressBar(progress, STARTUP_INTERVAL_MS);
+        // Check if hold duration met the requirement
+        if (progress >= STARTUP_INTERVAL_MS) {
+            GAME_Init();
+            next_state = SYS_FACTORY_RESET;
+        }
+    } else {
+        FB_DrawProgressBar(progress, STARTUP_INTERVAL_MS);
+        // Buttons were released after being held
+        // Or the boot window has expired
+        if ((hold_ms > 0) || ((now_ms - boot_window_ms) >= BOOT_WINDOW_MS)) {
+            next_state = SYS_SHUTDOWN;
+        }
+    }
+    // Cleanup: reset static variables to default values
+    if (next_state != SYS_STARTUP) {
+        hold_ms = 0;
+        boot_window_ms = 0;
+    }
+    return next_state;
+}
+
+static system_state_t SYS_ProcessFactoryReset(uint32_t now_ms) {
+    static uint32_t factory_reset_time_ms = 0;
+    system_state_t next_state = SYS_FACTORY_RESET;
+    if (IS_JUMP_BUTTON_PRESSED() && IS_DUCK_BUTTON_PRESSED()) {
+        // Initialize factory reset timestamp on the very first frame
+        if (factory_reset_time_ms == 0) {
+            factory_reset_time_ms = now_ms;
+        }
+        // Check if factory reset trigger time has elapsed
+        if ((now_ms - factory_reset_time_ms) >= FACTORY_TRIGGER_MS) {
+            high_score = 0;
+            FLASH_Write_u32(HI_SCORE_FLASH_ADDR, high_score);
+            GAME_Init();
+            next_state = SYS_WAIT_GAME_START;
+        }
+    } else {
+        // Buttons were released after being held, switch to next state
+        if (factory_reset_time_ms > 0) {
+            next_state = SYS_WAIT_GAME_START;
+        }
+    }
+    // Cleanup: reset static variables to default values
+    if (next_state != SYS_FACTORY_RESET) {
+        factory_reset_time_ms = 0;
+    }
+    return next_state;
+}
+
+static system_state_t SYS_ProcessGame(uint32_t now_ms) {
+    if (trex_state == CRASHED) {
+        return SYS_GAME_OVER;
+    }
+    FB_Clear();
+    GAME_HandleTrexState();
+    GAME_ShowScore();
+    // Create new obstacles
+    if (GAME_CountVisibleCacti(obstacles) < CACTUS_MAX_COUNT) {
+        uint8_t previous_cactus;
+        if (latest_cactus > 0) {
+            previous_cactus = latest_cactus - 1;
+        } else {
+            previous_cactus = CACTUS_MAX_COUNT - 1;
+        }
+        if (obstacles[latest_cactus].visible == false &&
+            !obstacles[PTERODACTYL].visible) {
+            if ((int) obstacles[previous_cactus].x <=
+                    (WIDTH - obstacles[previous_cactus].width) ||
+                !obstacles[previous_cactus].visible) {
+                GAME_CreateCactus(&obstacles[latest_cactus]);
+                uint16_t random_distance =
+                    obstacle_respawn_base_distance +
+                    (rand() % obstacle_respawn_max_distance);
+                obstacles[latest_cactus].x += (float) random_distance;
+                // Respawn pterodatyl?
+                if (random_distance >= show_pterodactyl) {
+                    // Replace cactus with pterodactyl
+                    obstacles[latest_cactus].visible = false;
+                    GAME_CreatePterodactyl(&obstacles[CACTUS_MAX_COUNT]);
+                    obstacles[PTERODACTYL].x += (float) random_distance;
+                }
+                latest_cactus++;
+            }
+        }
+        if (latest_cactus == CACTUS_MAX_COUNT) {
+            latest_cactus = 0;
+        }
+    }
+    // Update cacti
+    for (uint8_t i = 0; i < CACTUS_MAX_COUNT; i++) {
+        GAME_UpdateCactus(&obstacles[i]);
+    }
+    // Update pterodactyl
+    GAME_UpdatePterodactyl(&obstacles[PTERODACTYL]);
+    // Update trex
+    GAME_UpdateTrex();
+    GAME_UpdateHorizon();
+    if (inverted_mode) {
+        FB_InvertColor();
+    }
+    // Speed up the game periodically
+    static uint32_t game_speed_update_clock = 0;
+    if ((now_ms - game_speed_update_clock) >= GAME_SCORE_INCREMENT) {
+        game_speed_update_clock = now_ms;
+        score++;
+        GAME_AdjustDifficulty();
+    }
+    // Update score
+    if ((score % INVERTED_MODE_THRESHOLD) == 0) {
+        inverted_mode = !inverted_mode;
+    }
+    return SYS_RUNNING_GAME;
+}
+
+static system_state_t SYS_ProcessGameOver() {
+    // If in inverterd mode, switch back to original (dark) layout
+    if (inverted_mode) {
+        FB_InvertColor();
+    }
+    // Add the "game over" image to the frame buffer
+    FB_DrawImage(GAME_OVER_X, GAME_OVER_Y, game_over_splash,
+                 GAME_OVER_SPLASH_WIDTH, GAME_OVER_SPLASH_HEIGHT);
+    // Restore the inverted (light) mode if needed
+    if (inverted_mode) {
+        FB_InvertColor();   // invert back
+    }
+    // Process high score
+    if (score > high_score) {
+        high_score = score;
+        FLASH_Write_u32(HI_SCORE_FLASH_ADDR, high_score);
+    }
+    return SYS_WAIT_GAME_START;
+}
+
+static system_state_t SYS_MonitorInactivity(uint32_t now_ms) {
+    static uint32_t last_button_press_time = 0;
+    if (button_state) {
+        last_button_press_time = now_ms;
+    }
+    if ((now_ms - last_button_press_time) >= INACTIVITY_PERIOD_MS) {
+        return SYS_SHUTDOWN;
+    }
+    return current_state;
+}
+
+static system_state_t SYS_MonitorBattery(uint32_t now_ms) {
+    static uint32_t battery_check_time = 0;
+    if ((now_ms - battery_check_time) >= BATTERY_MONITOR_PERIOD_MS) {
+        battery_check_time = now_ms;
+        uint16_t battery_voltage =
+            POWER_MANAGER_ReadBatteryVoltage();   // read battery status
+        if (battery_voltage <= MIN_BATTERY_VOLTAGE) {
+            POWER_MANAGER_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2,
+                                            (HEIGHT - BATTERY_ICON_HEIGHT) / 2,
+                                            0);
+            Delay_Ms(LOW_BATTERY_ALERT_DURATION_MS);
+            return SYS_SHUTDOWN;
+        }
+    }
+    return current_state;
+}
 
 static void TIMER_Init() {
     // Enable TIM1 clock
@@ -446,13 +501,7 @@ static void TIMER_Init() {
 void TIM1_UP_IRQHandler(void) {
     if (TIM1->INTFR & TIM_UIF) {
         TIM1->INTFR = ~TIM_UIF;   // clear interrupt flag
-
-        global_clock++;
-        lb_debounce_clock++;
-        rb_debounce_clock++;
-        game_speed_update_clock++;
-        inactivity_clock++;
-        battery_monitor_clock++;
+        system_millis++;
     }
 }
 
@@ -487,8 +536,8 @@ static void FLASH_Write_u32(uint32_t address, uint32_t val) {
     FLASH->CTLR = CR_PAGE_ER;
     FLASH->ADDR = (intptr_t) ptr;
     FLASH->CTLR = CR_STRT_Set | CR_PAGE_ER;
-    while (FLASH->STATR & FLASH_STATR_BSY) {
-    }   // Takes about 3ms.
+    while (FLASH->STATR & FLASH_STATR_BSY) {   // Takes about 3ms.
+    }
 
     // Clear buffer and prep for flashing.
     FLASH->CTLR = CR_PAGE_PG;   // synonym of FTPG.
@@ -497,13 +546,14 @@ static void FLASH_Write_u32(uint32_t address, uint32_t val) {
         ptr;   // This can actually happen about anywhere toward the end here.
 
     // Note: It takes about 6 clock cycles for this to finish.
-    while (FLASH->STATR & FLASH_STATR_BSY) {
-    }   // No real need for this.
+    while (FLASH->STATR & FLASH_STATR_BSY) {   // No real need for this.
+    }
 
     *ptr = val;                                       // Write to the memory
     FLASH->CTLR = CR_PAGE_PG | FLASH_CTLR_BUF_LOAD;   // Load the buffer.
-    while (FLASH->STATR & FLASH_STATR_BSY) {
-    }   // Only needed if running from RAM.
+    while (FLASH->STATR &
+           FLASH_STATR_BSY) {   // Only needed if running from RAM.
+    }
 
     // Actually write the flash out. (Takes about 3ms)
     FLASH->CTLR = CR_PAGE_PG | CR_STRT_Set;
@@ -522,29 +572,38 @@ static void BUTTONS_Init() {
     funDigitalWrite(DUCK_BUTTON_GPIO, FUN_HIGH);
 }
 
-static void BUTTONS_MonitorButtons() {
-    if (lb_debounce_clock >= DEBOUNCE_INTERVAL_MS) {
-        lb_debounce_clock = 0;
-        if (!funDigitalRead(JUMP_BUTTON_GPIO)) {
+static void BUTTONS_MonitorButtons(uint32_t now_ms) {
+    static uint32_t jump_btn_last_stable_change_ms = 0;
+    static uint8_t jump_btn_raw_state = 1;   // Start high (not pressed)
+    static uint32_t duck_btn_last_stable_change_ms = 0;
+    static uint8_t duck_btn_raw_state = 1;   // Start high (not pressed)
+    // JUMP button
+    uint8_t current_jump_raw = funDigitalRead(JUMP_BUTTON_GPIO);
+    if (current_jump_raw != jump_btn_raw_state) {
+        jump_btn_last_stable_change_ms = now_ms;
+        jump_btn_raw_state = current_jump_raw;
+    } else if ((now_ms - jump_btn_last_stable_change_ms) >=
+               DEBOUNCE_INTERVAL_MS) {
+        // State has been stable for the debounce interval, update button state
+        if (!current_jump_raw) {
             button_state |= (1 << JUMP_BUTTON_BIT);
         } else {
             button_state &= ~(1 << JUMP_BUTTON_BIT);
         }
-    } else if ((button_state & (1 << JUMP_BUTTON_BIT)) ==
-               !funDigitalRead(JUMP_BUTTON_GPIO)) {
-        lb_debounce_clock = 0;
     }
-
-    if (rb_debounce_clock >= DEBOUNCE_INTERVAL_MS) {
-        rb_debounce_clock = 0;
-        if (!funDigitalRead(DUCK_BUTTON_GPIO)) {
+    // DUCK button
+    uint8_t current_duck_raw = funDigitalRead(DUCK_BUTTON_GPIO);
+    if (current_duck_raw != duck_btn_raw_state) {
+        duck_btn_last_stable_change_ms = now_ms;
+        duck_btn_raw_state = current_duck_raw;
+    } else if ((now_ms - duck_btn_last_stable_change_ms) >=
+               DEBOUNCE_INTERVAL_MS) {
+        // State has been stable for the debounce interval, update button state
+        if (!current_duck_raw) {
             button_state |= (1 << DUCK_BUTTON_BIT);
         } else {
             button_state &= ~(1 << DUCK_BUTTON_BIT);
         }
-    } else if ((button_state & (1 << DUCK_BUTTON_BIT)) ==
-               !funDigitalRead(DUCK_BUTTON_GPIO)) {
-        rb_debounce_clock = 0;
     }
 }
 
@@ -597,26 +656,14 @@ static void POWER_MANAGER_turnOff() {
     funDigitalWrite(AUTOCUTOFF_GPIO, FUN_LOW);
 }
 
-void POWER_MANAGER_MonitorInactivity() {
-    if (button_state) {
-        inactivity_clock = 0;
-    }
-    if (inactivity_clock >= INACTIVITY_PERIOD_MS) {
-        POWER_MANAGER_turnOff();
-    }
-}
-
 static uint16_t POWER_MANAGER_ReadBatteryVoltage() {
     // Code borrowed and adapted from
     // ch32fun/examples/adc_polled/adc_polled.c:adc_get() start sw conversion
-
     // (auto clears)
     ADC1->CTLR2 |= ADC_SWSTART;
-
     // wait for conversion complete
     while (!(ADC1->STATR & ADC_EOC)) {
     }
-
     // get result
     // Voltage divider is returning half of the real voltage from the lipo
     // ADC has 10bit resolution and the voltage reference is Vdd = 3.3V
@@ -624,33 +671,12 @@ static uint16_t POWER_MANAGER_ReadBatteryVoltage() {
     return (uint16_t) voltage;
 }
 
-static void POWER_MANAGER_MonitorBattery() {
-    if (battery_monitor_clock >= BATTERY_MONITOR_PERIOD_MS) {
-        battery_monitor_clock = 0;   // reset timer
-        battery_voltage =
-            POWER_MANAGER_ReadBatteryVoltage();   // read battery status
-        if (battery_voltage <= MIN_BATTERY_VOLTAGE) {
-            POWER_MANAGER_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2,
-                                            (HEIGHT - BATTERY_ICON_HEIGHT) / 2,
-                                            0);
-            global_clock = 0;
-            while (global_clock < LOW_BATTERY_ALERT_DURATION_MS) {
-            }
-            POWER_MANAGER_turnOff();
-            while (1) {
-            }   // wait until the device is powered off
-        }
-    }
-}
-
 static void POWER_MANAGER_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
                                             uint8_t progress) {
     FB_Clear();
     FB_DrawRectangle(pos_x + 2, pos_y + 0, 30, 16, false);
     FB_DrawRectangle(pos_x + 0, pos_y + 4, 2, 8, true);
-
     FB_DrawRectangle(pos_x + 6, pos_y + 4, progress * 22 / UINT8_MAX, 8, true);
-    SSD1306_Display(frame_buffer);
 }
 
 static void FB_Clear() {
@@ -756,6 +782,30 @@ static void FB_DrawRectangle(uint8_t pos_x, uint8_t pos_y, uint8_t width,
     }
 }
 
+static void FB_DrawProgressBar(uint32_t current_ms, uint32_t target_ms) {
+    FB_Clear();
+    FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH,
+                     PROGRESS_BAR_HEIGHT, false);
+
+    if (target_ms == 0) {
+        return;
+    }
+
+    // Upcast temporarily to uint64_t to prevent overflow during cross
+    // multiplication
+    uint32_t filled_width =
+        (uint32_t) (((uint64_t) current_ms * PROGRESS_BAR_WIDTH) / target_ms);
+
+    if (filled_width > PROGRESS_BAR_WIDTH) {
+        filled_width = PROGRESS_BAR_WIDTH;
+    }
+
+    if (filled_width > 0) {
+        FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, filled_width,
+                         PROGRESS_BAR_HEIGHT, true);
+    }
+}
+
 static void GAME_Init() {
     score = 0;
     high_score = FLASH_Read_u32(HI_SCORE_FLASH_ADDR);
@@ -766,24 +816,19 @@ static void GAME_Init() {
     obstacle_respawn_max_distance = WIDTH - OBSTACLE_RESPAWN_BASE_DISTANCE;
     show_pterodactyl = SHOW_PTERODACTYL;
     inverted_mode = false;
-
     // Seed the Random Number Generator.
-    seed(global_clock);
-
+    // FIXME: consider other seed sources
+    seed(system_millis);
     GAME_InitHorizon();
     GAME_InitTrex();
     for (uint8_t i = 0; i < CACTUS_MAX_COUNT; i++) {
         GAME_InitCactus(&obstacles[i]);
     }
     GAME_InitPrerodactyl(&obstacles[PTERODACTYL]);
-
     FB_Clear();
     GAME_UpdateHorizon();
     GAME_ShowScore();
     GAME_UpdateTrex();
-
-    // RENDER
-    SSD1306_Display(frame_buffer);
 }
 
 static void GAME_ShowScore() {
@@ -793,20 +838,20 @@ static void GAME_ShowScore() {
     FB_DrawUnsignedValue(SCORE_X, SCORE_Y, score);
 }
 
-static void GAME_HandleState() {
-    // update trex state based on button states
+static void GAME_HandleTrexState() {
+    // Update trex state based on button states
     if (IS_JUMP_BUTTON_PRESSED()) {
         trex_state = JUMPING;
     }
     if (IS_DUCK_BUTTON_PRESSED() && (trex_state != JUMPING)) {
         if (trex_state == RUNNING) {
-            // preload a ducking sprite
+            // Preload a ducking sprite
             trex.sprite = trex_ducking1;
         }
         trex_state = DUCKING;
     } else if (trex_state != JUMPING) {
         if (trex_state == DUCKING) {
-            // preload a running sprite
+            // Preload a running sprite
             trex.sprite = trex_running1;
         }
         trex_state = RUNNING;
@@ -816,7 +861,7 @@ static void GAME_HandleState() {
 static void GAME_AdjustDifficulty() {
     if ((score % LEVEL_UP_POINTS) == 0) {
         game_speed += GAME_SPEED_DELTA;
-        // increase the distance between obstacles a little bit
+        // Increase the distance between obstacles a little bit
         obstacle_respawn_base_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
         obstacle_respawn_max_distance += OBSTACLE_RESPAWN_DISTANCE_INC;
         show_pterodactyl += OBSTACLE_RESPAWN_DISTANCE_INC * 2;
@@ -836,7 +881,7 @@ static void GAME_InitHorizon() {
 
 static void GAME_UpdateHorizon() {
     for (uint8_t i = horizon.x; i < horizon.width; i++) {
-        // create some space between trex and horizon
+        // Create some space between trex and horizon
         if (trex_state == RUNNING &&
             ((float) i >= trex.x + TREX_STANDING_CLEARENCE_MIN) &&
             ((float) i < trex.x + TREX_STANDING_CLEARENCE_MAX)) {
@@ -858,26 +903,22 @@ static void GAME_UpdateHorizon() {
             ((float) i < trex.x + TREX_DUCKING_CLEARENCE_MAX)) {
             continue;
         }
-
         int8_t bump1_xx = FLOOR(horizon.bump1_x);
         int8_t bump2_xx = FLOOR(horizon.bump2_x);
-
         if ((i >= bump1_xx && i < bump1_xx + horizon.bump1_width) ||
             (i >= bump2_xx &&
-             i < bump2_xx + horizon.bump2_width)) {   // draw bumps
+             i < bump2_xx + horizon.bump2_width)) {   // Draw bumps
             FB_SetPixel(i, horizon.y);
-        } else {   // draw horizon line
+        } else {   // Draw horizon line
             FB_SetPixel(i, horizon.y + 1);
         }
     }
-
-    // move bumps
+    // Move bumps
     if (horizon.bump1_x - game_speed > 0) {
         horizon.bump1_x -= game_speed;
     } else {
         horizon.bump1_x = horizon.width;
     }
-
     if (horizon.bump2_x - game_speed > 0) {
         horizon.bump2_x -= game_speed;
     } else {
@@ -906,11 +947,9 @@ static void GAME_CreatePterodactyl(game_object_t* pterodactyl) {
 
 static void GAME_UpdatePterodactyl(game_object_t* pterodactyl) {
     static unsigned int flapping_counter = 0;
-
     if (!pterodactyl->visible) {
         return;
     }
-
     if (++flapping_counter >= PTERODACTYL_WING_SWAP) {
         flapping_counter = 0;
 
@@ -921,8 +960,7 @@ static void GAME_UpdatePterodactyl(game_object_t* pterodactyl) {
         }
     }
     FB_DrawGameObject(*pterodactyl);
-
-    // move to the left in small steps
+    // Move to the left in small steps
     if (pterodactyl->x + (float) pterodactyl->width > 0) {
         pterodactyl->x -= game_speed;
     } else {
@@ -970,10 +1008,8 @@ static void GAME_UpdateCactus(game_object_t* cactus) {
     if (!cactus->visible) {
         return;
     }
-
     FB_DrawGameObject(*cactus);
-
-    // move to the left in small steps
+    // Move to the left in small steps
     if (cactus->x + (float) cactus->width > 0) {
         cactus->x -= game_speed;
     } else {
@@ -1002,11 +1038,9 @@ static void GAME_InitTrex() {
 
 static void GAME_UpdateRunningTrex() {
     static uint16_t running_counter = 0;
-
     trex.y = HEIGHT - TREX_STANDING_HEIGHT - 1;
     trex.width = TREX_STANDING_WIDTH;
     trex.height = TREX_STANDING_HEIGHT;
-
     if (++running_counter >= TREX_RUNNING_SPEED) {
         running_counter = 0;
         if (trex.sprite == trex_running1) {
@@ -1019,11 +1053,9 @@ static void GAME_UpdateRunningTrex() {
 
 static void GAME_UpdateDuckingTrex() {
     static uint16_t running_counter = 0;
-
     trex.y = HEIGHT - TREX_DUCKING_HEIGHT - 1;
     trex.width = TREX_DUCKING_WIDTH;
     trex.height = TREX_DUCKING_HEIGHT;
-
     if (++running_counter >= TREX_RUNNING_SPEED) {
         running_counter = 0;
         if (trex.sprite == trex_ducking1) {
@@ -1036,32 +1068,29 @@ static void GAME_UpdateDuckingTrex() {
 
 static void GAME_UpdateJumpingTrex() {
     static uint8_t jump_max_y_reached = 0;
-
     trex.width = TREX_STANDING_WIDTH;
     trex.height = TREX_STANDING_HEIGHT;
     trex.sprite = trex_standing_init;
-
-    // jump up
+    // Jump up
     if (!jump_max_y_reached && trex.y >= (HEIGHT - TREX_MAX_JUMP_HEIGHT)) {
         trex.y -= JUMPING_SPEED;
     } else {
         jump_max_y_reached = 1;
     }
-    // let gravity do the landing
+    // Let gravity do the landing
     if (jump_max_y_reached && trex.y <= (HEIGHT - TREX_STANDING_HEIGHT - 2)) {
         trex.y += GAME_GRAVITY;
     }
-
-    // next state running
+    // Next state running
     if (jump_max_y_reached && trex.y > (HEIGHT - TREX_STANDING_HEIGHT - 2)) {
         trex.y = HEIGHT - TREX_STANDING_HEIGHT - 1;
         if (button_state & (1 << DUCK_BUTTON_BIT)) {
             trex_state = DUCKING;
-            // preload ducking sprite
+            // Preload ducking sprite
             trex.sprite = trex_ducking1;
         } else {
             trex_state = RUNNING;
-            // preload running sprite
+            // Preload running sprite
             trex.sprite = trex_running1;
         }
         jump_max_y_reached = 0;
@@ -1082,7 +1111,6 @@ static void GAME_UpdateTrex() {
     case CRASHED:
         break;
     }
-
     if (FB_DrawGameObject(trex)) {
         trex_state = CRASHED;
     }
