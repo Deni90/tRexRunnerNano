@@ -241,19 +241,3 @@ void SSD1306_Display(const uint8_t* buffer) {
     memcpy(temp_buf + 1, buffer, SSD1306_BUFFER_SIZE);
     ssd1306_i2c_send(SSD1306_I2C_ADDR, temp_buf, SSD1306_BUFFER_SIZE + 1);
 }
-
-void SSD1306_Clear()
-{
-    uint8_t cmds[] = {
-        SSD1306_SET_COL_ADDR,
-        0x00,                           // Column start address (0 = reset)
-        SSD1306_WIDTH - 1,              // Column end address (127 = reset)
-        SSD1306_SET_PAGE_ADDR,
-        0x00,                           // Page start address (0 = reset)
-        3                               // Page end address
-    };
-    SSD1306_Commands(cmds, sizeof(cmds));
-    uint8_t buf[SSD1306_BUFFER_SIZE];
-    memset(buf, 0, SSD1306_BUFFER_SIZE);
-    SSD1306_Display(buf);
-}

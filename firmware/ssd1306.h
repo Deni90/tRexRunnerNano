@@ -25,11 +25,4 @@ void SSD1306_Init();
  */
 void SSD1306_Display(const uint8_t* buffer);
 
-/**
- * @brief Clear the SSD1306 display.
- *
- * Fills the display with empty pixels (all pixels off).
- */
-void SSD1306_Clear();
-
 #endif
