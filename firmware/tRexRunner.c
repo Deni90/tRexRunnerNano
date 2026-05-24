@@ -66,7 +66,8 @@
 #define DUCK_BUTTON_GPIO         PC4
 #define IS_DUCK_BUTTON_PRESSED() (button_state & (1 << DUCK_BUTTON_BIT))
 
-#define AUTOCUTOFF_GPIO PD3
+#define AUTOCUTOFF_GPIO      PD3
+#define CHARGE_COMPLETE_GPIO PD5
 
 #define BOOT_WINDOW_MS      1500
 #define STARTUP_INTERVAL_MS 1000
@@ -87,12 +88,15 @@
     10000                 // Supports printing up to 5-digit numbers (0-99999)
 #define DECIMAL_BASE 10   // Base-10 numerical division step
 
+#define CHARGE_CHECK_INTERVAL_MS 10
+
 //------------------------------------------------------------------------------
 // Type definitions
 //------------------------------------------------------------------------------
 
 typedef enum system_state_e {
     SYS_STARTUP,
+    SYS_BATTERY_CHARGING,
     SYS_FACTORY_RESET,
     SYS_WAIT_GAME_START,
     SYS_RUNNING_GAME,
@@ -143,8 +147,6 @@ static void FLASH_Write_u32(uint32_t address, uint32_t val);
 static void POWER_MANAGER_init();
 static void POWER_MANAGER_turnOff();
 static uint16_t POWER_MANAGER_ReadBatteryVoltage();
-static void POWER_MANAGER_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
-                                            uint8_t progress);
 
 static void FB_Clear();
 static uint8_t FB_DrawImage(int16_t pos_x, int16_t pos_y, const uint8_t* image,
@@ -156,9 +158,12 @@ static void FB_InvertColor();
 static void FB_DrawRectangle(uint8_t pos_x, uint8_t pos_y, uint8_t width,
                              uint8_t height, uint8_t fill);
 static void FB_DrawProgressBar(uint32_t current_ms, uint32_t target_ms);
+static void FB_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
+                                 uint8_t progress);
 
 static void SYS_HardwareSetup();
 static system_state_t SYS_ProcessStartup(uint32_t now_ms);
+static system_state_t SYS_ProcessBatteryCharging(uint32_t now_ms);
 static system_state_t SYS_ProcessFactoryReset(uint32_t now_ms);
 static system_state_t SYS_ProcessGame(uint32_t now_ms);
 static system_state_t SYS_ProcessGameOver();
@@ -239,6 +244,9 @@ int main() {
         case SYS_STARTUP:
             current_state = SYS_ProcessStartup(current_time);
             break;
+        case SYS_BATTERY_CHARGING:
+            current_state = SYS_ProcessBatteryCharging(current_time);
+            break;
         case SYS_FACTORY_RESET:
             current_state = SYS_ProcessFactoryReset(current_time);
             break;
@@ -275,9 +283,11 @@ int main() {
             SSD1306_Display(frame_buffer);
         }
         // Periodical checks
-        BUTTONS_MonitorButtons(current_time);
-        current_state = SYS_MonitorInactivity(current_time);
-        // current_state = SYS_MonitorBattery(current_time);
+        if (current_state != SYS_BATTERY_CHARGING) {
+            BUTTONS_MonitorButtons(current_time);
+            current_state = SYS_MonitorInactivity(current_time);
+            // current_state = SYS_MonitorBattery(current_time);
+        }
     }
 
     return 0;
@@ -335,6 +345,44 @@ static system_state_t SYS_ProcessStartup(uint32_t now_ms) {
         boot_window_ms = 0;
     }
     return next_state;
+}
+
+static system_state_t SYS_ProcessBatteryCharging(uint32_t now_ms) {
+    static uint32_t last_check_time_ms = 0;
+    static uint32_t last_icon_update_time_ms = 0;
+    static uint16_t battery_icon_x_pos = (WIDTH - BATTERY_ICON_WITH) / 2;
+    static uint8_t progress = 0;
+    // Initialize static variables for the first time
+    if (last_check_time_ms == 0) {
+        last_check_time_ms = now_ms;
+    }
+    if (last_icon_update_time_ms == 0) {
+        last_icon_update_time_ms = now_ms;
+    }
+    // Peridically check the battery charge status
+    if ((now_ms - last_check_time_ms) > CHARGE_CHECK_INTERVAL_MS) {
+        last_check_time_ms = now_ms;
+        if (!funDigitalRead(CHARGE_COMPLETE_GPIO)) {
+            // Charging
+            ++progress;
+        } else {
+            // Charging complete
+            progress = UINT8_MAX;
+        }
+        FB_ShowBatteryStatus(battery_icon_x_pos,
+                             (HEIGHT - BATTERY_ICON_HEIGHT) / 2, progress);
+    }
+    // Periodically update the battery icon position to prevent OLED burn in
+    if ((now_ms - last_icon_update_time_ms) >=
+        UINT8_MAX * CHARGE_CHECK_INTERVAL_MS) {
+        last_icon_update_time_ms = now_ms;
+        battery_icon_x_pos += BATTERY_ICON_X_POS_INCREMENT;
+        if (battery_icon_x_pos >= WIDTH - BATTERY_ICON_WITH) {
+            battery_icon_x_pos = 0;
+        }
+    }
+    // Keep this state indefinitely
+    return SYS_BATTERY_CHARGING;
 }
 
 static system_state_t SYS_ProcessFactoryReset(uint32_t now_ms) {
@@ -468,9 +516,8 @@ static system_state_t SYS_MonitorBattery(uint32_t now_ms) {
         uint16_t battery_voltage =
             POWER_MANAGER_ReadBatteryVoltage();   // read battery status
         if (battery_voltage <= MIN_BATTERY_VOLTAGE) {
-            POWER_MANAGER_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2,
-                                            (HEIGHT - BATTERY_ICON_HEIGHT) / 2,
-                                            0);
+            FB_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2,
+                                 (HEIGHT - BATTERY_ICON_HEIGHT) / 2, 0);
             Delay_Ms(LOW_BATTERY_ALERT_DURATION_MS);
             return SYS_SHUTDOWN;
         }
@@ -611,6 +658,8 @@ static void POWER_MANAGER_init() {
     // TODO initialize GPIO pins
     funPinMode(AUTOCUTOFF_GPIO, GPIO_CFGLR_IN_PUPD);
     funDigitalWrite(AUTOCUTOFF_GPIO, FUN_HIGH);
+    funPinMode(CHARGE_COMPLETE_GPIO, GPIO_CFGLR_IN_PUPD);
+    funDigitalWrite(CHARGE_COMPLETE_GPIO, FUN_HIGH);
 
     // Initializes ADC for battery voltage monitoring
     // code borrowed from ch32fun/examples/adc_polled/adc_polled.c:adc_init()
@@ -669,14 +718,6 @@ static uint16_t POWER_MANAGER_ReadBatteryVoltage() {
     // ADC has 10bit resolution and the voltage reference is Vdd = 3.3V
     float voltage = 3300.0 / 512 * ADC1->RDATAR;
     return (uint16_t) voltage;
-}
-
-static void POWER_MANAGER_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
-                                            uint8_t progress) {
-    FB_Clear();
-    FB_DrawRectangle(pos_x + 2, pos_y + 0, 30, 16, false);
-    FB_DrawRectangle(pos_x + 0, pos_y + 4, 2, 8, true);
-    FB_DrawRectangle(pos_x + 6, pos_y + 4, progress * 22 / UINT8_MAX, 8, true);
 }
 
 static void FB_Clear() {
@@ -804,6 +845,18 @@ static void FB_DrawProgressBar(uint32_t current_ms, uint32_t target_ms) {
         FB_DrawRectangle(PROGRESS_BAR_X, PROGRESS_BAR_Y, filled_width,
                          PROGRESS_BAR_HEIGHT, true);
     }
+}
+
+static void FB_ShowBatteryStatus(uint8_t pos_x, uint8_t pos_y,
+                                 uint8_t progress) {
+    FB_Clear();
+    FB_DrawRectangle(pos_x + 2, pos_y + 0, BATTERY_ICON_WITH - 2,
+                     BATTERY_ICON_HEIGHT, false);
+    FB_DrawRectangle(pos_x + 0, pos_y + 4, 2, BATTERY_ICON_PROFRESS_BAR_HEIGHT,
+                     true);
+    FB_DrawRectangle(pos_x + 6, pos_y + 4,
+                     progress * BATTERY_ICON_PROFRESS_BAR_WIDTH / UINT8_MAX,
+                     BATTERY_ICON_PROFRESS_BAR_HEIGHT, true);
 }
 
 static void GAME_Init() {
