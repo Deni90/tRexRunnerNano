@@ -656,7 +656,7 @@ static void BUTTONS_MonitorButtons(uint32_t now_ms) {
 
 static void POWER_MANAGER_init() {
     // TODO initialize GPIO pins
-    funPinMode(AUTOCUTOFF_GPIO, GPIO_CFGLR_IN_PUPD);
+    funPinMode(AUTOCUTOFF_GPIO, GPIO_CFGLR_OUT_10Mhz_PP);
     funDigitalWrite(AUTOCUTOFF_GPIO, FUN_HIGH);
     funPinMode(CHARGE_COMPLETE_GPIO, GPIO_CFGLR_IN_PUPD);
     funDigitalWrite(CHARGE_COMPLETE_GPIO, FUN_HIGH);
