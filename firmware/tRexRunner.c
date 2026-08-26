@@ -68,6 +68,7 @@
 
 #define AUTOCUTOFF_GPIO      PD3
 #define CHARGE_COMPLETE_GPIO PD5
+#define USB_PWR_GPIO         PD2
 
 #define BOOT_WINDOW_MS      1500
 #define STARTUP_INTERVAL_MS 1000
@@ -77,7 +78,7 @@
 
 #define MIN_BATTERY_VOLTAGE           3600   // mV
 #define BATTERY_MONITOR_PERIOD_MS     30000
-#define LOW_BATTERY_ALERT_DURATION_MS 1500
+#define LOW_BATTERY_ALERT_DURATION_MS 2500
 
 #define HI_SCORE_FLASH_ADDR 0x08003FC0
 
@@ -286,7 +287,7 @@ int main() {
         if (current_state != SYS_BATTERY_CHARGING) {
             BUTTONS_MonitorButtons(current_time);
             current_state = SYS_MonitorInactivity(current_time);
-            // current_state = SYS_MonitorBattery(current_time);
+            current_state = SYS_MonitorBattery(current_time);
         }
     }
 
@@ -317,7 +318,9 @@ static system_state_t SYS_ProcessStartup(uint32_t now_ms) {
         boot_window_ms = now_ms;
     }
     uint32_t progress = 0;
-    if (IS_JUMP_BUTTON_PRESSED() && IS_DUCK_BUTTON_PRESSED()) {
+    if (!funDigitalRead(USB_PWR_GPIO)) {
+        next_state = SYS_BATTERY_CHARGING;
+    } else if (IS_JUMP_BUTTON_PRESSED() && IS_DUCK_BUTTON_PRESSED()) {
         // Start holding if we weren't already holding
         if (hold_ms == 0) {
             hold_ms = now_ms;
@@ -358,6 +361,10 @@ static system_state_t SYS_ProcessBatteryCharging(uint32_t now_ms) {
     }
     if (last_icon_update_time_ms == 0) {
         last_icon_update_time_ms = now_ms;
+    }
+    // Check is the USB still connected. If not, turn off the device
+    if (funDigitalRead(USB_PWR_GPIO)) {
+        return SYS_SHUTDOWN;
     }
     // Peridically check the battery charge status
     if ((now_ms - last_check_time_ms) > CHARGE_CHECK_INTERVAL_MS) {
@@ -518,6 +525,7 @@ static system_state_t SYS_MonitorBattery(uint32_t now_ms) {
         if (battery_voltage <= MIN_BATTERY_VOLTAGE) {
             FB_ShowBatteryStatus((WIDTH - BATTERY_ICON_WITH) / 2,
                                  (HEIGHT - BATTERY_ICON_HEIGHT) / 2, 0);
+            SSD1306_Display(frame_buffer);
             Delay_Ms(LOW_BATTERY_ALERT_DURATION_MS);
             return SYS_SHUTDOWN;
         }
@@ -655,11 +663,13 @@ static void BUTTONS_MonitorButtons(uint32_t now_ms) {
 }
 
 static void POWER_MANAGER_init() {
-    // TODO initialize GPIO pins
+    // Initialize GPIO pins
     funPinMode(AUTOCUTOFF_GPIO, GPIO_CFGLR_OUT_10Mhz_PP);
     funDigitalWrite(AUTOCUTOFF_GPIO, FUN_HIGH);
     funPinMode(CHARGE_COMPLETE_GPIO, GPIO_CFGLR_IN_PUPD);
     funDigitalWrite(CHARGE_COMPLETE_GPIO, FUN_HIGH);
+    funPinMode(USB_PWR_GPIO, GPIO_CFGLR_IN_PUPD);
+    funDigitalWrite(USB_PWR_GPIO, FUN_HIGH);
 
     // Initializes ADC for battery voltage monitoring
     // code borrowed from ch32fun/examples/adc_polled/adc_polled.c:adc_init()
