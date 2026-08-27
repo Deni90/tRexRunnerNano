@@ -895,7 +895,7 @@ static void GAME_Init() {
 }
 
 static void GAME_ShowScore() {
-    FB_DrawImage(HI_STR_X, HI_STR_X, hi_score_str, HI_SCORE_STR_WIDTH,
+    FB_DrawImage(HI_STR_X, HI_STR_Y, hi_score_str, HI_SCORE_STR_WIDTH,
                  HI_SCORE_STR_HEIGHT);
     FB_DrawUnsignedValue(HI_SCORE_X, HI_SCORE_Y, high_score);
     FB_DrawUnsignedValue(SCORE_X, SCORE_Y, score);
