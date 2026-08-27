@@ -84,7 +84,7 @@
 
 #define PAGE_HEIGHT 8
 
-#define FLOOR(val) ((int) (val) - ((val) < (int) (val)))
+#define CEIL(val) ((int) (val) + ((val) > (int) (val)))
 #define MAX_DIGIT_DIVISOR                                                      \
     10000                 // Supports printing up to 5-digit numbers (0-99999)
 #define DECIMAL_BASE 10   // Base-10 numerical division step
@@ -778,7 +778,7 @@ static uint8_t FB_DrawGameObject(game_object_t game_object) {
     if (!game_object.visible) {
         return false;
     }
-    return FB_DrawImage(FLOOR(game_object.x), FLOOR(game_object.y),
+    return FB_DrawImage(CEIL(game_object.x), CEIL(game_object.y),
                         game_object.sprite, game_object.width,
                         game_object.height);
 }
@@ -966,8 +966,8 @@ static void GAME_UpdateHorizon() {
             ((float) i < trex.x + TREX_DUCKING_CLEARENCE_MAX)) {
             continue;
         }
-        int8_t bump1_xx = FLOOR(horizon.bump1_x);
-        int8_t bump2_xx = FLOOR(horizon.bump2_x);
+        int8_t bump1_xx = CEIL(horizon.bump1_x);
+        int8_t bump2_xx = CEIL(horizon.bump2_x);
         if ((i >= bump1_xx && i < bump1_xx + horizon.bump1_width) ||
             (i >= bump2_xx &&
              i < bump2_xx + horizon.bump2_width)) {   // Draw bumps
