@@ -335,6 +335,8 @@ static system_state_t SYS_ProcessStartup(uint32_t now_ms) {
             next_state = SYS_FACTORY_RESET;
         }
     } else {
+        // Check battery status at startup
+        next_state = SYS_MonitorBattery(UINT32_MAX);
         FB_DrawProgressBar(progress, STARTUP_INTERVAL_MS);
         // Buttons were released after being held
         // Or the boot window has expired
