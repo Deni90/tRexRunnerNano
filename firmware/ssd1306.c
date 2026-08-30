@@ -215,7 +215,7 @@ void SSD1306_Init(void) {
         0x30,                       // 0.83xVcc
         /* display */
         SSD1306_SET_CONTRAST,   // set contrast control
-        0xFF,
+        0x80,
         SSD1306_SET_ENTIRE_ON,   // set entire display on to follow RAM content
         SSD1306_SET_NORM_DISP,   // set normal (not inverted) display
         SSD1306_SET_CHARGE_PUMP,   // set charge pump
