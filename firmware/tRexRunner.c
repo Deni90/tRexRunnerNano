@@ -171,6 +171,9 @@ static system_state_t SYS_ProcessGameOver();
 static system_state_t SYS_MonitorInactivity(uint32_t now_ms);
 static system_state_t SYS_MonitorBattery(uint32_t now_ms);
 
+static void WDT_Setup();
+static void WDT_Feed();
+
 static void GAME_Init();
 static void GAME_ShowScore();
 static void GAME_HandleTrexState();
@@ -289,6 +292,8 @@ int main() {
             current_state = SYS_MonitorInactivity(current_time);
             current_state = SYS_MonitorBattery(current_time);
         }
+
+        WDT_Feed();
     }
 
     return 0;
@@ -304,6 +309,7 @@ static void SYS_HardwareSetup() {
     BUTTONS_Init();
     TIMER_Init();
     POWER_MANAGER_init();
+    WDT_Setup();
     // give OLED some more time
     Delay_Ms(OLED_STARTUP_DELAY_MS);
     SSD1306_Init();
@@ -534,6 +540,19 @@ static system_state_t SYS_MonitorBattery(uint32_t now_ms) {
     }
     return current_state;
 }
+
+static void WDT_Setup() {
+    IWDG->CTLR = 0x5555;
+    // set up watchdog to about 4 s
+    IWDG->PSCR = IWDG_Prescaler_128;
+
+    IWDG->CTLR = 0x5555;
+    IWDG->RLDR = 0xfff;
+
+    IWDG->CTLR = 0xCCCC;
+}
+
+static void WDT_Feed() { IWDG->CTLR = 0xAAAA; }
 
 static void TIMER_Init() {
     // Enable TIM1 clock
