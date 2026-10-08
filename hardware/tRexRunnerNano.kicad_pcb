@@ -9,7 +9,7 @@
 	(paper "A5")
 	(title_block
 		(title "tRexRunnerNano")
-		(rev "v1.0.0")
+		(rev "v1.0.1")
 		(company "Daniel Knezevic")
 	)
 	(layers
