@@ -56,7 +56,7 @@
 #define GAME_OVER_Y 10
 
 #define DEBOUNCE_INTERVAL_MS  50
-#define OLED_STARTUP_DELAY_MS 100
+#define OLED_STARTUP_DELAY_MS 50
 
 #define JUMP_BUTTON_BIT          0
 #define JUMP_BUTTON_GPIO         PC3
